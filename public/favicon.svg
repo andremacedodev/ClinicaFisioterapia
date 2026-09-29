@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="peach" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F0D3B8"/>
+      <stop offset="1" stop-color="#DDB08C"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#C9BC5C"/>
+      <stop offset="1" stop-color="#A89A3A"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#FFFBF4"/>
+  <!-- asa esquerda (pêssego) -->
+  <path d="M30 32 C24 16 12 8 8 13 C4 19 12 30 30 33 C16 35 10 46 16 51 C21 55 28 45 30 36 Z" fill="url(#peach)"/>
+  <!-- asa direita (dourada) -->
+  <path d="M34 32 C40 16 52 8 56 13 C60 19 52 30 34 33 C48 35 54 46 48 51 C43 55 36 45 34 36 Z" fill="url(#gold)"/>
+  <!-- corpo -->
+  <rect x="30.5" y="22" width="3" height="26" rx="1.5" fill="#8F8230"/>
+  <path d="M31 23 C29 18 26 15 23 14 M33 23 C35 18 38 15 41 14" stroke="#8F8230" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+</svg>
