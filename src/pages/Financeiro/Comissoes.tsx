@@ -1,13 +1,17 @@
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
-import { currencyFormatter, useFinancial } from "./financialCore";
+import { currencyFormatter, formatDate, useFinancial } from "./financialCore";
+import { CommissionPaymentsReview } from "./RevisaoComissoes";
 import { clsx } from "clsx";
 import { Button } from "../../components/ui/Button";
 import { Check } from "lucide-react";
 
 export const FinancialCommissions = () => {
   const {
-    setCommissionTarget,
+    openCommissionPayment,
+    commissionPayments,
+    supportsCommissionPayments,
+    selectedCommissionPeriod,
     patientSearchTerm,
     reportStartDate,
     setReportStartDate,
@@ -24,6 +28,7 @@ export const FinancialCommissions = () => {
 
   return (
     <>
+      {!isPhysio && supportsCommissionPayments && <CommissionPaymentsReview />}
       <div>
         <Card className="p-0 overflow-hidden">
         <div className="p-6 border-b border-slate-100 dark:border-slate-800">
@@ -118,6 +123,18 @@ export const FinancialCommissions = () => {
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-500">
                       {currencyFormatter.format(item.commissionPaid)}
+                      {supportsCommissionPayments && !hasPatientSearch && (
+                        <PaidDates
+                          dates={commissionPayments
+                            .filter(
+                              (payment) =>
+                                payment.professional_id === item.professionalId &&
+                                payment.period_start >= selectedCommissionPeriod.startDate &&
+                                payment.period_end <= selectedCommissionPeriod.endDate,
+                            )
+                            .map((payment) => payment.paid_at)}
+                        />
+                      )}
                     </td>
                     <td
                       className={clsx(
@@ -135,7 +152,7 @@ export const FinancialCommissions = () => {
                           size="sm"
                           variant="outline"
                           disabled={item.professionalShare <= 0}
-                          onClick={() => setCommissionTarget(item)}
+                          onClick={() => openCommissionPayment(item)}
                         >
                           <Check size={14} />
                           Registrar pagamento
@@ -173,3 +190,10 @@ export const FinancialCommissions = () => {
     </>
   );
 };
+
+const PaidDates = ({ dates }: { dates: string[] }) =>
+  dates.length ? (
+    <span className="block text-xs text-slate-400">
+      pago em {[...dates].sort().map(formatDate).join(", ")}
+    </span>
+  ) : null;

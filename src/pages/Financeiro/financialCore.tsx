@@ -98,6 +98,67 @@ export type CommissionDetailRow = {
   totalCommission: number;
 };
 
+export type CommissionPayment = {
+  id: string;
+  /** Vazio em pagamento antigo sem profissional identificado (em revisão). */
+  professional_id: string | null;
+  period_start: string;
+  period_end: string;
+  amount: number | string;
+  paid_at: string;
+  needs_review: boolean;
+  transaction_id: string | null;
+  profiles: { full_name: string } | null;
+  description: string | null;
+};
+
+/**
+ * Pagamentos de comissão com período de referência. Se o banco ainda não tem
+ * a tabela (migration não aplicada), o app segue com o cálculo antigo.
+ */
+export async function fetchCommissionPayments(
+  clinicId: string,
+): Promise<{ supported: boolean; payments: CommissionPayment[]; error?: string }> {
+  const { data, error } = await supabase
+    .from("commission_payments")
+    .select(
+      "id, professional_id, period_start, period_end, amount, paid_at, needs_review, transaction_id, profiles (full_name), transactions (description)",
+    )
+    .eq("clinic_id", clinicId)
+    .order("paid_at", { ascending: false });
+
+  if (error) {
+    const missingTable =
+      error.code === "42P01" ||
+      error.code === "PGRST205" ||
+      /commission_payments/.test(error.message);
+    return missingTable
+      ? { supported: false, payments: [] }
+      : { supported: true, payments: [], error: error.message };
+  }
+
+  const rows = (data ?? []) as unknown as (Omit<CommissionPayment, "description"> & {
+    transactions: { description: string | null } | null;
+  })[];
+  return {
+    supported: true,
+    payments: rows.map(({ transactions, ...payment }) => ({
+      ...payment,
+      description: transactions?.description ?? null,
+    })),
+  };
+}
+
+export function monthRange(date: string): { startDate: string; endDate: string } {
+  const [year, month] = date.split("-").map(Number);
+  const lastDay = new Date(year, month, 0).getDate();
+  const mm = String(month).padStart(2, "0");
+  return {
+    startDate: `${year}-${mm}-01`,
+    endDate: `${year}-${mm}-${String(lastDay).padStart(2, "0")}`,
+  };
+}
+
 export type TransactionRow = {
   id: string;
   patient_id: string | null;
@@ -1064,6 +1125,10 @@ export function useFinancialController() {
   );
   const [commissionTarget, setCommissionTarget] =
     useState<ProfessionalReport | null>(null);
+  const [commissionPayments, setCommissionPayments] = useState<CommissionPayment[]>([]);
+  const [supportsCommissionPayments, setSupportsCommissionPayments] = useState(false);
+  const [commissionPaymentAmount, setCommissionPaymentAmount] = useState("");
+  const [commissionPaidAt, setCommissionPaidAt] = useState(todayDate);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("Pix");
   const [paymentReceivedDate, setPaymentReceivedDate] = useState(todayDate);
@@ -1433,6 +1498,11 @@ export function useFinancialController() {
     setTransactions(
       (finalTransactionsResult.data ?? []) as unknown as TransactionRow[],
     );
+
+    const commissionPaymentsResult = await fetchCommissionPayments(profile.clinic_id);
+    if (commissionPaymentsResult.error) setError(commissionPaymentsResult.error);
+    setSupportsCommissionPayments(commissionPaymentsResult.supported);
+    setCommissionPayments(commissionPaymentsResult.payments);
     setLoading(false);
   };
 
@@ -1598,6 +1668,16 @@ export function useFinancialController() {
       rawCommissionReport.map((item) => {
         const commissionPaid = hasPatientSearch
           ? 0
+          : supportsCommissionPayments
+            ? // Conta o pagamento no período a que ele se refere, não na data em que foi pago.
+              commissionPayments
+                .filter(
+                  (payment) =>
+                    payment.professional_id === item.professionalId &&
+                    payment.period_start >= selectedCommissionPeriod.startDate &&
+                    payment.period_end <= selectedCommissionPeriod.endDate,
+                )
+                .reduce((total, payment) => total + money(payment.amount), 0)
           : transactions
               .filter(
                 (transaction) =>
@@ -1624,9 +1704,11 @@ export function useFinancialController() {
         };
       }),
     [
+      commissionPayments,
       hasPatientSearch,
       rawCommissionReport,
       selectedCommissionPeriod,
+      supportsCommissionPayments,
       transactions,
     ],
   );
@@ -2036,8 +2118,58 @@ export function useFinancialController() {
     await loadFinancialData();
   };
 
+  const openCommissionPayment = (item: ProfessionalReport) => {
+    setError(null);
+    setCommissionTarget(item);
+    setCommissionPaymentAmount(item.professionalShare.toFixed(2));
+    setCommissionPaidAt(todayDate());
+  };
+
   const handleRegisterCommissionPayment = async () => {
     if (!commissionTarget || !profile?.clinic_id) return;
+
+    if (supportsCommissionPayments) {
+      const amount = Number(commissionPaymentAmount.replace(",", "."));
+      if (!amount || amount <= 0) {
+        setError("Informe um valor de comissão válido.");
+        return;
+      }
+      if (amount > commissionTarget.professionalShare + 0.005) {
+        setError(
+          `O valor é maior que o saldo a pagar no período (${currencyFormatter.format(commissionTarget.professionalShare)}).`,
+        );
+        return;
+      }
+      if (!commissionPaidAt) {
+        setError("Informe a data do pagamento.");
+        return;
+      }
+
+      setSaving(true);
+      setError(null);
+
+      const { error: paymentError } = await supabase.rpc(
+        "register_commission_payment",
+        {
+          p_professional_id: commissionTarget.professionalId,
+          p_period_start: selectedCommissionPeriod.startDate,
+          p_period_end: selectedCommissionPeriod.endDate,
+          p_amount: amount,
+          p_paid_at: commissionPaidAt,
+        },
+      );
+
+      if (paymentError) {
+        setError(paymentError.message);
+        setSaving(false);
+        return;
+      }
+
+      setCommissionTarget(null);
+      setSaving(false);
+      await loadFinancialData();
+      return;
+    }
 
     setSaving(true);
     setError(null);
@@ -2063,6 +2195,47 @@ export function useFinancialController() {
     setCommissionTarget(null);
     setSaving(false);
     await loadFinancialData();
+  };
+
+  // Revisão dos pagamentos migrados: define profissional e mês de referência.
+  const handleConfirmCommissionPayment = async (
+    payment: CommissionPayment,
+    referenceMonth: string,
+    professionalId: string,
+  ) => {
+    const period = monthRange(`${referenceMonth}-01`);
+    setSaving(true);
+    setError(null);
+
+    const { error: updateError } = await supabase
+      .from("commission_payments")
+      .update({
+        professional_id: professionalId,
+        period_start: period.startDate,
+        period_end: period.endDate,
+        needs_review: false,
+      })
+      .eq("id", payment.id);
+
+    setSaving(false);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setCommissionPayments((current) =>
+      current.map((item) =>
+        item.id === payment.id
+          ? {
+              ...item,
+              professional_id: professionalId,
+              period_start: period.startDate,
+              period_end: period.endDate,
+              needs_review: false,
+            }
+          : item,
+      ),
+    );
   };
 
   const handleRegisterExpense = async (event: FormEvent<HTMLFormElement>) => {
@@ -2532,6 +2705,14 @@ export function useFinancialController() {
 
 
   return {
+    commissionPayments,
+    supportsCommissionPayments,
+    commissionPaymentAmount,
+    setCommissionPaymentAmount,
+    commissionPaidAt,
+    setCommissionPaidAt,
+    openCommissionPayment,
+    handleConfirmCommissionPayment,
     profile,
     clinicProfile,
     setClinicProfile,
