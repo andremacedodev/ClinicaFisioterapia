@@ -2,7 +2,7 @@ import { createPortal } from "react-dom";
 import { Card } from "../../components/ui/Card";
 import { FileDown, X } from "lucide-react";
 import { Button } from "../../components/ui/Button";
-import { currencyFormatter, formatBRLValue, parseCurrencyValue, useFinancial } from "./financialCore";
+import { currencyFormatter, formatBRLValue, formatDate, parseCurrencyValue, useFinancial } from "./financialCore";
 
 export const FinancialModals = () => {
   const {
@@ -30,6 +30,13 @@ export const FinancialModals = () => {
     handleRegisterPayment,
     handleRegisterCommissionPayment,
     generateFinancialPdf,
+    supportsCommissionPayments,
+    commissionPaymentAmount,
+    setCommissionPaymentAmount,
+    commissionPaidAt,
+    setCommissionPaidAt,
+    selectedCommissionPeriod,
+    error,
   } = useFinancial();
 
   return (
@@ -216,12 +223,65 @@ export const FinancialModals = () => {
             </button>
           </div>
 
-          <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 p-4 mb-4">
-            <p className="text-sm text-slate-500">Valor da comissão</p>
-            <p className="text-2xl font-bold text-slate-900 dark:text-white">
-              {currencyFormatter.format(commissionTarget.professionalShare)}
-            </p>
-          </div>
+          {supportsCommissionPayments ? (
+            <div className="space-y-4 mb-4">
+              <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 p-4">
+                <p className="text-sm text-slate-500">Referente a</p>
+                <p className="text-base font-semibold text-slate-900 dark:text-white">
+                  {formatDate(selectedCommissionPeriod.startDate)} a{" "}
+                  {formatDate(selectedCommissionPeriod.endDate)}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Saldo a pagar no período:{" "}
+                  {currencyFormatter.format(commissionTarget.professionalShare)}.
+                  Para outro período, feche e mude as datas do relatório.
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Data do pagamento
+                </label>
+                <input
+                  type="date"
+                  required
+                  className="mt-2 w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
+                  value={commissionPaidAt}
+                  onChange={(event) => setCommissionPaidAt(event.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Valor pago
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  className="mt-2 w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
+                  value={commissionPaymentAmount}
+                  onChange={(event) =>
+                    setCommissionPaymentAmount(parseCurrencyValue(event.target.value))
+                  }
+                />
+                <p className="mt-2 text-sm text-slate-500">
+                  Valor mostrado: {formatBRLValue(commissionPaymentAmount) || "R$ 0,00"}.
+                  Pode ser menor que o saldo (adiantamento).
+                </p>
+              </div>
+              {error && (
+                <p className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+                  {error}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 p-4 mb-4">
+              <p className="text-sm text-slate-500">Valor da comissão</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                {currencyFormatter.format(commissionTarget.professionalShare)}
+              </p>
+            </div>
+          )}
 
           <div className="flex gap-3 pt-2">
             <Button
