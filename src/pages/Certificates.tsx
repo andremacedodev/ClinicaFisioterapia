@@ -13,6 +13,13 @@ import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
+import { ClinicHeader } from "../components/ui/ClinicHeader";
+import {
+  CLINIC_HEADER_CSS,
+  ClinicProfile,
+  clinicHeaderHtml,
+  fetchClinicProfile,
+} from "../lib/clinicProfile";
 
 type CertificateKind = "comparecimento" | "afastamento";
 
@@ -48,10 +55,6 @@ async function loadProfessionals(clinicId: string) {
   }
   return result;
 }
-
-type ClinicInfo = {
-  name: string;
-};
 
 const kindLabel: Record<CertificateKind, string> = {
   comparecimento: "Comparecimento",
@@ -127,7 +130,7 @@ export const Certificates = () => {
       ),
     );
   };
-  const [clinic, setClinic] = useState<ClinicInfo | null>(null);
+  const [clinic, setClinic] = useState<ClinicProfile | null>(null);
   const [patientId, setPatientId] = useState(
     searchParams.get("patientId") ?? "",
   );
@@ -168,11 +171,10 @@ export const Certificates = () => {
 
       const [clinicResult, patientsResult, professionalsResult] =
         await Promise.all([
-          supabase
-            .from("clinics")
-            .select("name")
-            .eq("id", profile.clinic_id)
-            .single(),
+          fetchClinicProfile(profile.clinic_id).then(
+            (data) => ({ data, error: null }),
+            (error: Error) => ({ data: null, error }),
+          ),
           supabase
             .from("patients")
             .select("id, full_name, cpf")
@@ -196,7 +198,7 @@ export const Certificates = () => {
       const loadedProfessionals = (professionalsResult.data ??
         []) as ProfessionalOption[];
 
-      setClinic((clinicResult.data ?? null) as ClinicInfo | null);
+      setClinic(clinicResult.data);
       setPatients((patientsResult.data ?? []) as PatientOption[]);
       setProfessionals(loadedProfessionals);
 
@@ -288,6 +290,7 @@ export const Certificates = () => {
     receiptWindow.opener = null;
 
     const clinicName = clinic?.name ?? "Clínica";
+    const placeName = clinic?.address_city || clinicName;
     const professionalName = selectedProfessional.full_name;
     const registry = professionalRegistry.trim();
 
@@ -310,7 +313,7 @@ export const Certificates = () => {
             body { margin: 0; font-family: Arial, sans-serif; color: #0f172a; background: #fff; }
             .page { min-height: 250mm; display: flex; flex-direction: column; }
             header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 18px; }
-            .clinic { font-size: 20px; font-weight: 700; }
+            ${CLINIC_HEADER_CSS}
             .meta { font-size: 12px; color: #64748b; text-align: right; }
             h1 { margin: 52px 0 34px; text-align: center; font-size: 24px; letter-spacing: 0.12em; text-transform: uppercase; }
             .content { font-size: 17px; line-height: 1.8; text-align: justify; flex: 1; }
@@ -325,10 +328,7 @@ export const Certificates = () => {
         <body>
           <main class="page">
             <header>
-              <div>
-                <div class="clinic">${escapeHtml(clinicName)}</div>
-                <div class="meta">Atestado gerado pelo sistema</div>
-              </div>
+              ${clinicHeaderHtml(clinic)}
               <div class="meta">
                 Tipo: ${escapeHtml(kindLabel[kind])}<br />
                 Emissão: ${escapeHtml(formatDateBr(issueDate))}
@@ -336,7 +336,7 @@ export const Certificates = () => {
             </header>
             <h1>Atestado</h1>
             <section class="content">${escapeHtml(certificateText)}</section>
-            <p class="date">${escapeHtml(clinicName)}, ${escapeHtml(formatDateBr(issueDate))}.</p>
+            <p class="date">${escapeHtml(placeName)}, ${escapeHtml(formatDateBr(issueDate))}.</p>
             <section class="signature">
               <div class="signature-name">${escapeHtml(professionalName)}</div>
               <div class="signature-line">
@@ -616,19 +616,11 @@ export const Certificates = () => {
             </div>
             <div className="bg-slate-100 dark:bg-slate-950 p-4 sm:p-8">
               <div className="mx-auto min-h-[760px] max-w-[760px] bg-white text-slate-900 shadow-sm border border-slate-200 p-10 sm:p-14 flex flex-col">
-                <div className="flex items-start justify-between gap-6 border-b border-slate-200 pb-5">
-                  <div>
-                    <p className="text-xl font-bold">
-                      {clinic?.name ?? "Clínica"}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      Atestado gerado pelo sistema
-                    </p>
-                  </div>
-                  <div className="text-right text-xs text-slate-500">
-                    <p>Tipo: {kindLabel[kind]}</p>
-                    <p>Emissão: {formatDateBr(issueDate)}</p>
-                  </div>
+                <div className="space-y-3 border-b border-slate-200 pb-5">
+                  <ClinicHeader clinic={clinic} />
+                  <p className="text-xs text-slate-500">
+                    Tipo: {kindLabel[kind]} · Emissão: {formatDateBr(issueDate)}
+                  </p>
                 </div>
 
                 <h2 className="mt-14 mb-10 text-center text-2xl font-bold uppercase tracking-[0.12em]">
@@ -641,7 +633,8 @@ export const Certificates = () => {
                 </p>
 
                 <p className="mt-10 text-right text-sm">
-                  {clinic?.name ?? "Clínica"}, {formatDateBr(issueDate)}.
+                  {clinic?.address_city || clinic?.name || "Clínica"},{" "}
+                  {formatDateBr(issueDate)}.
                 </p>
 
                 <div className="mx-auto mt-20 w-full max-w-[360px] text-center">

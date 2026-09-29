@@ -29,6 +29,12 @@ import {
   buildCommissionReport,
 } from "../lib/commission";
 import { supabase } from "../lib/supabase";
+import {
+  CLINIC_HEADER_CSS,
+  ClinicProfile,
+  clinicHeaderHtml,
+  fetchClinicProfile,
+} from "../lib/clinicProfile";
 
 type PaymentStatus = "pago" | "pendente";
 
@@ -1062,6 +1068,18 @@ function getAppointmentResponsibleProfessional(
 
 export const Financial = () => {
   const { profile } = useAuth();
+  const [clinicProfile, setClinicProfile] = useState<ClinicProfile | null>(null);
+
+  useEffect(() => {
+    if (!profile?.clinic_id) return;
+    let active = true;
+    fetchClinicProfile(profile.clinic_id)
+      .then((data) => active && setClinicProfile(data))
+      .catch((error) => console.warn("Dados da clínica indisponíveis:", error));
+    return () => {
+      active = false;
+    };
+  }, [profile?.clinic_id]);
   const [packages, setPackages] = useState<PackageRow[]>([]);
   const [appointments, setAppointments] = useState<CommissionAppointment[]>([]);
   const [transactions, setTransactions] = useState<TransactionRow[]>([]);
@@ -2468,7 +2486,7 @@ export const Financial = () => {
       return;
     }
     const net = receiptTotal - paidTotal;
-    reportWindow.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/><title>Relatório financeiro</title><style>@page{size:A4;margin:16mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#0f172a;font-size:11px}h1{font-size:22px;margin:0 0 5px}.muted{color:#64748b;margin:0}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:22px 0}.summary div{border:1px solid #e2e8f0;border-radius:7px;padding:10px}.summary span{display:block;color:#64748b;font-size:10px;margin-bottom:5px}.summary strong{font-size:14px}section{margin-top:24px;break-inside:avoid}.section-title{border-bottom:2px solid #0f766e;display:flex;align-items:baseline;justify-content:space-between;padding-bottom:6px;margin-bottom:10px}h2{font-size:15px;margin:0}table{border-collapse:collapse;width:100%}th{background:#f1f5f9;color:#475569;font-size:9px;letter-spacing:.04em;text-align:left;text-transform:uppercase}th,td{border-bottom:1px solid #e2e8f0;padding:7px 6px;vertical-align:top}.amount{text-align:right;white-space:nowrap}.empty{border:1px dashed #cbd5e1;border-radius:6px;color:#64748b;padding:12px}footer{border-top:1px solid #e2e8f0;color:#64748b;font-size:9px;margin-top:28px;padding-top:9px}</style></head><body><header><h1>Relatório financeiro</h1><p class="muted">Período: ${formatDate(financialReportStartDate)} a ${formatDate(financialReportEndDate)}</p><p class="muted">Emitido em ${new Date().toLocaleDateString("pt-BR")}</p></header><div class="summary"><div><span>A pagar</span><strong>${currencyFormatter.format(payableTotal)}</strong></div><div><span>Pago</span><strong>${currencyFormatter.format(paidTotal)}</strong></div><div><span>Recebido</span><strong>${currencyFormatter.format(receiptTotal)}</strong></div><div><span>Resultado líquido</span><strong>${currencyFormatter.format(net)}</strong></div></div>${sections}<footer>Relatório gerado pelo sistema financeiro da clínica.</footer><script>window.onload=()=>window.print();<\/script></body></html>`);
+    reportWindow.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/><title>Relatório financeiro</title><style>@page{size:A4;margin:16mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#0f172a;font-size:11px}h1{font-size:22px;margin:0 0 5px}.muted{color:#64748b;margin:0}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:22px 0}.summary div{border:1px solid #e2e8f0;border-radius:7px;padding:10px}.summary span{display:block;color:#64748b;font-size:10px;margin-bottom:5px}.summary strong{font-size:14px}section{margin-top:24px;break-inside:avoid}.section-title{border-bottom:2px solid #0f766e;display:flex;align-items:baseline;justify-content:space-between;padding-bottom:6px;margin-bottom:10px}h2{font-size:15px;margin:0}table{border-collapse:collapse;width:100%}th{background:#f1f5f9;color:#475569;font-size:9px;letter-spacing:.04em;text-align:left;text-transform:uppercase}th,td{border-bottom:1px solid #e2e8f0;padding:7px 6px;vertical-align:top}.amount{text-align:right;white-space:nowrap}.empty{border:1px dashed #cbd5e1;border-radius:6px;color:#64748b;padding:12px}footer{border-top:1px solid #e2e8f0;color:#64748b;font-size:9px;margin-top:28px;padding-top:9px}${CLINIC_HEADER_CSS}.clinic-header{margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid #e2e8f0}</style></head><body>${clinicHeaderHtml(clinicProfile)}<header><h1>Relatório financeiro</h1><p class="muted">Período: ${formatDate(financialReportStartDate)} a ${formatDate(financialReportEndDate)}</p><p class="muted">Emitido em ${new Date().toLocaleDateString("pt-BR")}</p></header><div class="summary"><div><span>A pagar</span><strong>${currencyFormatter.format(payableTotal)}</strong></div><div><span>Pago</span><strong>${currencyFormatter.format(paidTotal)}</strong></div><div><span>Recebido</span><strong>${currencyFormatter.format(receiptTotal)}</strong></div><div><span>Resultado líquido</span><strong>${currencyFormatter.format(net)}</strong></div></div>${sections}<footer>Relatório gerado pelo sistema financeiro da clínica.</footer><script>window.onload=()=>window.print();<\/script></body></html>`);
     reportWindow.document.close();
     setFinancialReportOpen(false);
   };
@@ -2488,6 +2506,8 @@ export const Financial = () => {
           <title>Recibo</title>
           <style>
             body { font-family: Arial, sans-serif; padding: 32px; color: #0f172a; }
+            ${CLINIC_HEADER_CSS}
+            .clinic-header { max-width: 620px; margin-bottom: 20px; }
             .box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; max-width: 620px; }
             h1 { margin: 0 0 8px; }
             p { margin: 8px 0; }
@@ -2495,21 +2515,22 @@ export const Financial = () => {
           </style>
         </head>
         <body>
+          ${clinicHeaderHtml(clinicProfile)}
           <div class="box">
             <h1>Recibo de pagamento</h1>
-            <p>Paciente: <strong>${packageItem.patients?.full_name ?? "-"}</strong></p>
+            <p>Paciente: <strong>${escapeHtml(packageItem.patients?.full_name) || "-"}</strong></p>
             <p>Pacote: ${packageItem.total_lessons} aulas${money(packageItem.procedure_amount) > 0 ? ` + ${currencyFormatter.format(money(packageItem.procedure_amount))} em procedimentos` : ""}</p>
             <p>Parcela: ${installment?.installment_number ?? "-"}</p>
             <p>Forma de pagamento: ${installment?.payment_method ?? packageItem.payment_method ?? "-"}</p>
             <p class="value">${currencyFormatter.format(money(installment?.amount_paid ?? packageItem.amount_paid))}</p>
             <p>Emitido em ${new Date().toLocaleDateString("pt-BR")}</p>
           </div>
+          <script>window.onload = () => window.print();<\/script>
         </body>
       </html>
     `);
     receiptWindow.document.close();
     receiptWindow.focus();
-    receiptWindow.print();
   };
 
   const printTransactionReceipt = (transaction: TransactionRow) => {
@@ -2524,6 +2545,8 @@ export const Financial = () => {
           <title>Recibo</title>
           <style>
             body { font-family: Arial, sans-serif; padding: 32px; color: #0f172a; }
+            ${CLINIC_HEADER_CSS}
+            .clinic-header { max-width: 620px; margin-bottom: 20px; }
             .box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; max-width: 620px; }
             h1 { margin: 0 0 8px; }
             p { margin: 8px 0; }
@@ -2531,20 +2554,21 @@ export const Financial = () => {
           </style>
         </head>
         <body>
+          ${clinicHeaderHtml(clinicProfile)}
           <div class="box">
             <h1>Recibo de pagamento</h1>
-            <p>Paciente: <strong>${transaction.patients?.full_name ?? "-"}</strong></p>
-            <p>Referência: ${transaction.description ?? transaction.category}</p>
+            <p>Paciente: <strong>${escapeHtml(transaction.patients?.full_name) || "-"}</strong></p>
+            <p>Referência: ${escapeHtml(transaction.description ?? transaction.category)}</p>
             <p>Data: ${formatDate(transaction.due_date)}</p>
             <p class="value">${currencyFormatter.format(money(transaction.amount))}</p>
             <p>Emitido em ${new Date().toLocaleDateString("pt-BR")}</p>
           </div>
+          <script>window.onload = () => window.print();<\/script>
         </body>
       </html>
     `);
     receiptWindow.document.close();
     receiptWindow.focus();
-    receiptWindow.print();
   };
 
   return (
