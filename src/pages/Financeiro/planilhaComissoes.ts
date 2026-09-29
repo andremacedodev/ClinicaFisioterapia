@@ -31,11 +31,16 @@ export type CommissionWorkbookOptions = {
 
 const PRESENCE = "PRESENÇA";
 const ABSENCE = "FALTA";
+/** Reposição conta como presença, mas aparece escrita como reposição. */
+const MAKEUP = "REPOSIÇÃO";
 const MARK_OPTIONS = [
   PRESENCE,
   ABSENCE,
+  MAKEUP,
   `${PRESENCE} / ${PRESENCE}`,
   `${PRESENCE} / ${ABSENCE}`,
+  `${PRESENCE} / ${MAKEUP}`,
+  `${MAKEUP} / ${PRESENCE}`,
   `${ABSENCE} / ${ABSENCE}`,
 ];
 
@@ -49,6 +54,8 @@ const COLOR = {
   weekend: "FFF1F5F9",
   presenceFill: "FFDCFCE7",
   presenceText: "FF166534",
+  makeupFill: "FFEDE9FE",
+  makeupText: "FF5B21B6",
   absenceFill: "FFFFEDD5",
   absenceText: "FF9A3412",
   note: "FFFEF9C3",
@@ -282,7 +289,7 @@ function gridSheet(
   // valores calculados aqui só para exibir antes do Excel recalcular
   const rowValues = rows.map((patient) => {
     const marks = Object.values(patient.marks);
-    const presences = countMarks(marks, PRESENCE);
+    const presences = countMarks(marks, PRESENCE) + countMarks(marks, MAKEUP);
     const absences = countMarks(marks, ABSENCE);
     const paid = presences + absences;
     return {
@@ -332,9 +339,9 @@ function gridSheet(
   noteBlock(
     ws,
     7,
-    "Como usar: clique na célula do dia e escolha PRESENÇA ou FALTA na setinha da lista. " +
-      "Presenças e faltas pagas contam como aula paga. Os totais e os cartões acima se atualizam sozinhos. " +
-      "Colunas cinzas = fim de semana.",
+    "Como usar: clique na célula do dia e escolha PRESENÇA, REPOSIÇÃO ou FALTA na setinha da lista. " +
+      "Reposição conta como presença. Presenças e faltas pagas contam como aula paga. " +
+      "Os totais e os cartões acima se atualizam sozinhos. Colunas cinzas = fim de semana.",
     Math.min(lastColumn, 22),
   );
 
@@ -395,7 +402,14 @@ function gridSheet(
     const range = `${cellRef(firstDayColumn, r)}:${cellRef(lastDayColumn, r)}`;
     const values = rowValues[index];
     const formulas: Array<[number, ExcelJS.CellFormulaValue, string]> = [
-      [columns.presences, { formula: countFormula(range, PRESENCE), result: values.presences }, "0"],
+      [
+        columns.presences,
+        {
+          formula: `${countFormula(range, PRESENCE)}+${countFormula(range, MAKEUP)}`,
+          result: values.presences,
+        },
+        "0",
+      ],
       [columns.absences, { formula: countFormula(range, ABSENCE), result: values.absences }, "0"],
       [columns.paid, { formula: `${cellRef(columns.presences, r)}+${cellRef(columns.absences, r)}`, result: values.paid }, "0"],
       [columns.gross, { formula: `${cellRef(columns.paid, r)}*${cellRef(valueColumn, r)}`, result: values.gross }, MONEY],
@@ -455,7 +469,7 @@ function gridSheet(
     showErrorMessage: true,
     errorStyle: "stop",
     errorTitle: "Valor inválido",
-    error: "Escolha PRESENÇA ou FALTA na lista (ou deixe em branco).",
+    error: "Escolha PRESENÇA, REPOSIÇÃO ou FALTA na lista (ou deixe em branco).",
   });
   ws.addConditionalFormatting({
     ref: gridRange,
@@ -469,6 +483,12 @@ function gridSheet(
       {
         type: "expression",
         priority: 2,
+        formulae: [`NOT(ISERROR(SEARCH("${MAKEUP}",${firstGridCell})))`],
+        style: { fill: conditionalFill(COLOR.makeupFill), font: { color: { argb: COLOR.makeupText }, bold: true } },
+      },
+      {
+        type: "expression",
+        priority: 3,
         formulae: [`NOT(ISERROR(SEARCH("${PRESENCE}",${firstGridCell})))`],
         style: { fill: conditionalFill(COLOR.presenceFill), font: { color: { argb: COLOR.presenceText }, bold: true } },
       },
