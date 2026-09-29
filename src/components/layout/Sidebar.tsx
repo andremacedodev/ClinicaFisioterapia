@@ -9,6 +9,7 @@ import {
   MessageSquare, 
   LogOut,
   UserCog,
+  Settings,
   MoreHorizontal,
   X
 } from 'lucide-react';
@@ -32,6 +33,7 @@ export const Sidebar = () => {
     ...(isAdmin ? [{ icon: ReceiptText, label: messages.nav.invoices, path: '/notas-fiscais' }] : []),
     ...(isAdmin ? [{ icon: MessageSquare, label: messages.nav.whatsapp, path: '/whatsapp' }] : []),
     ...(isAdmin ? [{ icon: UserCog, label: messages.nav.team, path: '/equipe' }] : []),
+    ...(isAdmin ? [{ icon: Settings, label: messages.nav.settings, path: '/configuracoes' }] : []),
   ];
   const primaryMobileItems = menuItems.slice(0, 4);
   const secondaryMobileItems = menuItems.slice(4);

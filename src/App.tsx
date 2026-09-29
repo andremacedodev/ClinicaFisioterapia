@@ -20,6 +20,7 @@ import { Certificates } from "./pages/Certificates";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { SetupClinic } from "./pages/SetupClinic";
+import { ClinicSettings } from "./pages/ClinicSettings";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
 const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
@@ -159,6 +160,15 @@ function App() {
             element={
               <ProtectedLayout>
                 <Team />
+              </ProtectedLayout>
+            }
+          />
+
+          <Route
+            path="/configuracoes"
+            element={
+              <ProtectedLayout>
+                <ClinicSettings />
               </ProtectedLayout>
             }
           />
