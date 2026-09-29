@@ -69,6 +69,11 @@ function getCommissionAmount(appointment, classValue) {
     : classValue * 0.4;
 }
 
+// Reposição é uma aula dada: conta como presença para produção e comissão.
+function isHeldClass(status) {
+  return status === "presenca_registrada" || status === "reposicao";
+}
+
 export function isCommissionableAppointment(status) {
   return status !== "cancelada" && status !== "cancelled";
 }
@@ -114,7 +119,7 @@ export function buildCommissionReport(appointments, ownerId = null, startDate, e
 
     const classValue = getCommissionClassValue(appointment);
     const commissionAmount = getCommissionAmount(appointment, classValue);
-    if (appointment.status === "presenca_registrada") {
+    if (isHeldClass(appointment.status)) {
       current.gross += classValue;
       current.professionalShare += commissionAmount;
       current.heldClasses += 1;
@@ -180,12 +185,13 @@ export function buildCommissionDetailReport(appointments, ownerId, startDate, en
           totalCommission: 0,
         };
 
-      if (
-        appointment.status === "presenca_registrada" ||
-        appointment.status === "falta"
-      ) {
+      if (isHeldClass(appointment.status) || appointment.status === "falta") {
         const attendanceLabel =
-          appointment.status === "falta" ? "FALTA" : "PRESENÇA";
+          appointment.status === "falta"
+            ? "FALTA"
+            : appointment.status === "reposicao"
+              ? "REPOSIÇÃO"
+              : "PRESENÇA";
         const attendances = current.attendanceByDate[appointmentDate] ?? [];
         attendances.push(attendanceLabel);
         current.attendanceByDate[appointmentDate] = attendances;
