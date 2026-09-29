@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase";
+import { resolveStoragePath } from "../lib/storageFiles";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -315,15 +316,13 @@ export async function uploadExame(
 
   if (uploadError) throw new Error(`Erro no upload: ${uploadError.message}`);
 
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  // O bucket é privado: guardamos o caminho e geramos link assinado ao abrir.
+  return path;
 }
 
 export async function deleteExame(url: string): Promise<void> {
-  // Extrai o path relativo a partir da URL pública
-  const match = url.match(/patient-files\/(.+)$/);
-  if (!match) return;
-  const path = match[1];
+  const path = resolveStoragePath(BUCKET, url);
+  if (!path) return;
   const { error } = await supabase.storage.from(BUCKET).remove([path]);
   if (error) throw new Error(`Erro ao excluir arquivo: ${error.message}`);
 }
