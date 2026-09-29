@@ -2,6 +2,7 @@ import { createPortal } from "react-dom";
 import { Card } from "../../components/ui/Card";
 import { FileDown, X } from "lucide-react";
 import { Button } from "../../components/ui/Button";
+import { PAYMENT_METHODS } from "../../lib/payments";
 import { currencyFormatter, formatBRLValue, formatDate, parseCurrencyValue, useFinancial } from "./financialCore";
 
 export const FinancialModals = () => {
@@ -107,13 +108,20 @@ export const FinancialModals = () => {
           <div className="flex items-start justify-between mb-6">
             <div>
               <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                Registrar pagamento
+                {paymentTarget.cardConfirmation
+                  ? "Confirmar depósito do cartão"
+                  : "Registrar pagamento"}
               </h2>
               <p className="text-sm text-slate-500">
                 {paymentTarget.kind === "package"
                   ? `${paymentTarget.packageItem.patients?.full_name ?? "Paciente"} · Parcela #${paymentTarget.installment.installment_number}`
                   : `${paymentTarget.transaction.patients?.full_name ?? "Paciente"} · Procedimentos`}
               </p>
+              {paymentTarget.cardConfirmation && (
+                <p className="mt-2 rounded-lg bg-sky-50 p-2 text-xs text-sky-800 dark:bg-sky-900/30 dark:text-sky-200">
+                  O paciente já pagou no cartão. Confirme quando a maquininha depositar este valor na conta.
+                </p>
+              )}
             </div>
             <button
               className="p-2 text-slate-400 hover:bg-slate-100 rounded-lg"
@@ -152,11 +160,9 @@ export const FinancialModals = () => {
                 value={paymentMethod}
                 onChange={(event) => setPaymentMethod(event.target.value)}
               >
-                <option>Pix</option>
-                <option>Cartão de crédito</option>
-                <option>Cartão de débito</option>
-                <option>Dinheiro</option>
-                <option>Transferência</option>
+                {PAYMENT_METHODS.map((method) => (
+                  <option key={method}>{method}</option>
+                ))}
               </select>
             </div>
             <div>

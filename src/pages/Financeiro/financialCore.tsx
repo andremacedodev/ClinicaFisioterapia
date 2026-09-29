@@ -3,6 +3,12 @@
   A lógica veio de src/pages/Financial.tsx sem alterações.
 */
 import { supabase } from "../../lib/supabase";
+import {
+  CARD_MACHINE_METHOD,
+  CREDIT_CARD_METHOD,
+  PAYMENT_METHODS,
+  isCardMachineReceivable,
+} from "../../lib/payments";
 import type { CommissionWorkbookOptions } from "./planilhaComissoes";
 import { useAuth } from "../../context/AuthContext";
 import { ChangeEvent, FormEvent, ReactNode, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
@@ -180,7 +186,7 @@ export type TransactionRow = {
 
 export type TransactionStatus = TransactionRow["status"];
 
-export type ReceivableFilter = "open" | "paid" | "all";
+export type ReceivableFilter = "open" | "card" | "paid" | "all";
 export type DueSort = "asc" | "desc";
 export type ExpenseViewFilter = "period" | "payable";
 export type ExpenseReminderTone = "overdue" | "today" | "soon";
@@ -208,6 +214,8 @@ export type ReceivableRow = {
   professionalName: string;
   remaining: number;
   status: PaymentStatus;
+  /** Parcela que a maquininha do cartão deposita (não é dívida do paciente). */
+  cardMachine: boolean;
 };
 
 export type ProcedureReceivableRow = {
@@ -217,6 +225,8 @@ export type ProcedureReceivableRow = {
   professionalName: string;
   remaining: number;
   status: PaymentStatus;
+  /** Parcela que a maquininha do cartão deposita (não é dívida do paciente). */
+  cardMachine: boolean;
 };
 
 export type PackageReceiptReceivableRow = {
@@ -226,6 +236,8 @@ export type PackageReceiptReceivableRow = {
   professionalName: string;
   remaining: number;
   status: PaymentStatus;
+  /** Parcela que a maquininha do cartão deposita (não é dívida do paciente). */
+  cardMachine: boolean;
 };
 
 export type ReceivableItem =
@@ -238,11 +250,38 @@ export type PaymentTarget =
       kind: "package";
       packageItem: PackageRow;
       installment: InstallmentRow;
+      /** Confirmação de depósito da maquininha (muda título e textos). */
+      cardConfirmation?: boolean;
     }
   | {
       kind: "procedure";
       transaction: TransactionRow;
+      cardConfirmation?: boolean;
     };
+
+/** Pacote antigo registrado no cartão que ainda tem parcelas em aberto. */
+export type LegacyCardPackage = {
+  packageItem: PackageRow;
+  firstOpenInstallment: InstallmentRow;
+  openAmount: number;
+  openCount: number;
+};
+
+/** Converte formas antigas/livres ("cartão crédito 3x", "pix") para a lista. */
+export function paymentMethodForSelect(value: string | null | undefined): string {
+  const normalized = normalizeSearchText(value);
+  if (!normalized) return "Pix";
+  if (normalized.includes("credito") || isCardMachineReceivable(value)) return CREDIT_CARD_METHOD;
+  if (normalized.includes("debito")) return "Cartão de débito";
+  return (
+    PAYMENT_METHODS.find((method) => normalized.startsWith(normalizeSearchText(method))) ?? "Pix"
+  );
+}
+
+export function looksLikeCreditCard(value: string | null | undefined): boolean {
+  const normalized = normalizeSearchText(value);
+  return normalized.includes("credito") || (normalized.includes("cartao") && !normalized.includes("debito"));
+}
 
 export const currencyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -1378,6 +1417,7 @@ export function useFinancialController() {
         professionalName: getPatientProfessionalName(packageItem.patients),
         remaining: getRemainingInstallment(installment),
         status: getInstallmentPaymentStatus(installment),
+        cardMachine: isCardMachineReceivable(installment.payment_method),
       })),
     );
     const procedureRows: ReceivableItem[] = filteredVisibleTransactions
@@ -1392,6 +1432,7 @@ export function useFinancialController() {
             ? 0
             : money(transaction.amount),
         status: paymentStatusFromTransaction(transaction.status),
+        cardMachine: isCardMachineReceivable(transaction.description),
       }));
     // A entrada não corresponde a uma parcela: ela é um recebimento já pago
     // na contratação/renovação e precisa aparecer nos filtros Pagas e Todas.
@@ -1404,6 +1445,7 @@ export function useFinancialController() {
         professionalName: getPatientProfessionalName(transaction.patients),
         remaining: 0,
         status: paymentStatusFromTransaction(transaction.status),
+        cardMachine: false,
       }));
     const rows = [...packageRows, ...procedureRows, ...initialReceiptRows];
 
@@ -1411,6 +1453,7 @@ export function useFinancialController() {
       .filter((row) => {
         if (receivableFilter === "paid") return row.status === "pago";
         if (receivableFilter === "open") return row.remaining > 0;
+        if (receivableFilter === "card") return row.cardMachine && row.remaining > 0;
         return true;
       })
       .sort((a, b) => {
@@ -1427,23 +1470,90 @@ export function useFinancialController() {
       });
   }, [dueSort, filteredPackages, filteredVisibleTransactions, receivableFilter]);
 
+  // Pacotes antigos com forma "cartão de crédito" que ficaram com parcelas em
+  // aberto (antes não havia como dizer que a maquininha já pagou tudo).
+  const legacyCardPackages = useMemo<LegacyCardPackage[]>(
+    () =>
+      filteredPackages.flatMap((packageItem) => {
+        if (!looksLikeCreditCard(packageItem.payment_method)) return [];
+        const open = getInstallments(packageItem).filter(
+          (installment) =>
+            getRemainingInstallment(installment) > 0 &&
+            !isCardMachineReceivable(installment.payment_method),
+        );
+        if (open.length === 0) return [];
+        return [
+          {
+            packageItem,
+            firstOpenInstallment: open[0],
+            openAmount: open.reduce((total, item) => total + getRemainingInstallment(item), 0),
+            openCount: open.length,
+          },
+        ];
+      }),
+    [filteredPackages],
+  );
+
+  // Parcelas da maquininha que já venceram e ninguém confirmou.
+  const overdueCardReceivables = useMemo(() => {
+    const today = todayDate();
+    const installments = filteredPackages.flatMap((packageItem) =>
+      getInstallments(packageItem).filter(
+        (installment) =>
+          isCardMachineReceivable(installment.payment_method) &&
+          getRemainingInstallment(installment) > 0 &&
+          installment.due_date <= today,
+      ).map((installment) => getRemainingInstallment(installment)),
+    );
+    const procedures = filteredVisibleTransactions
+      .filter(
+        (transaction) =>
+          isCardMachineReceivable(transaction.description) &&
+          transaction.status !== "paid" &&
+          transaction.status !== "cancelled" &&
+          transaction.due_date <= today,
+      )
+      .map((transaction) => money(transaction.amount));
+    const amounts = [...installments, ...procedures];
+    return { count: amounts.length, amount: amounts.reduce((total, value) => total + value, 0) };
+  }, [filteredPackages, filteredVisibleTransactions]);
+
   const openPaymentModal = (
     packageItem: PackageRow,
     installment: InstallmentRow,
+    options: { amount?: number; date?: string; notes?: string } = {},
   ) => {
-    setPaymentTarget({ kind: "package", packageItem, installment });
-    setPaymentAmount(String(getRemainingInstallment(installment) || ""));
+    const cardConfirmation = isCardMachineReceivable(installment.payment_method);
+    setPaymentTarget({ kind: "package", packageItem, installment, cardConfirmation });
+    // Duas casas: "300.00" (o campo lê só dígitos; "300" viraria R$ 3,00).
+    const amount = options.amount ?? getRemainingInstallment(installment);
+    setPaymentAmount(amount > 0 ? amount.toFixed(2) : "");
     setPaymentMethod(
-      installment.payment_method ?? packageItem.payment_method ?? "Pix",
+      paymentMethodForSelect(installment.payment_method ?? packageItem.payment_method),
     );
-    setPaymentReceivedDate(todayDate());
-    setPaymentNotes("");
+    setPaymentReceivedDate(options.date ?? todayDate());
+    setPaymentNotes(options.notes ?? "");
+  };
+
+  // Pacote antigo pago no cartão: quita todas as parcelas de uma vez
+  // (a janela de pagamento distribui o valor entre as parcelas em aberto).
+  const openLegacyCardSettlement = (legacy: LegacyCardPackage) => {
+    openPaymentModal(legacy.packageItem, legacy.firstOpenInstallment, {
+      amount: Math.max(
+        money(legacy.packageItem.total_amount) - money(legacy.packageItem.amount_paid),
+        0,
+      ),
+      date: (legacy.packageItem.start_date || legacy.packageItem.created_at || todayDate()).slice(0, 10),
+      notes: "Pago no cartão na contratação",
+    });
+    setPaymentMethod(CREDIT_CARD_METHOD);
   };
 
   const openProcedurePaymentModal = (transaction: TransactionRow) => {
-    setPaymentTarget({ kind: "procedure", transaction });
-    setPaymentAmount(String(money(transaction.amount) || ""));
-    setPaymentMethod("Pix");
+    const cardConfirmation = isCardMachineReceivable(transaction.description);
+    setPaymentTarget({ kind: "procedure", transaction, cardConfirmation });
+    setPaymentAmount(money(transaction.amount) > 0 ? money(transaction.amount).toFixed(2) : "");
+    setPaymentMethod(cardConfirmation ? CREDIT_CARD_METHOD : "Pix");
     setPaymentReceivedDate(todayDate());
     setPaymentNotes("");
   };
@@ -1588,7 +1698,11 @@ export function useFinancialController() {
           .from("package_installments")
           .update({
             amount_paid: installmentPaid,
-            payment_method: paymentMethod,
+            payment_method:
+              isCardMachineReceivable(installment.payment_method) &&
+              paymentMethod === CREDIT_CARD_METHOD
+                ? CARD_MACHINE_METHOD
+                : paymentMethod,
             status: installmentStatus,
             paid_at: installmentStatus === "pago" ? paymentDate : null,
           })
@@ -2243,6 +2357,9 @@ export function useFinancialController() {
 
 
   return {
+    legacyCardPackages,
+    overdueCardReceivables,
+    openLegacyCardSettlement,
     commissionPayments,
     supportsCommissionPayments,
     commissionPaymentAmount,

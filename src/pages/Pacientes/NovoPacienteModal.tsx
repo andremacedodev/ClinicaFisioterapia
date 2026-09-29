@@ -6,7 +6,6 @@ import {
   Calendar,
   Clock,
   ClipboardList,
-  CreditCard,
   Hash,
   Loader2,
   Mail,
@@ -19,6 +18,8 @@ import {
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { SESSION_DURATION_MINUTES } from "../Agenda/Agendamentoservice";
+import { PagamentoContratacao } from "./PagamentoContratacao";
+import { applyPaymentChoice, validatePaymentChoice } from "./pagamento";
 import {
   NewPatientForm,
   Patient,
@@ -75,6 +76,11 @@ const emptyForm: NewPatientForm = {
   payment_method: "",
   payment_status: "pendente",
   installments: 1,
+  payment_mode: "",
+  card_installments: 1,
+  card_settlement: "now",
+  first_due_date: "",
+  installments_channel: "patient",
 };
 
 const WEEKDAYS = [
@@ -480,6 +486,12 @@ function formFromPatient(
     payment_method: activePackage?.payment_method ?? "",
     payment_status: activePackage?.payment_status ?? "pendente",
     installments: activePackage?.installments ?? 1,
+    // A edição não mexe no financeiro; os campos abaixo só servem ao formulário.
+    payment_mode: "",
+    card_installments: 1,
+    card_settlement: "now",
+    first_due_date: "",
+    installments_channel: "patient",
   };
 }
 
@@ -495,6 +507,18 @@ export const NovoPacienteModal = ({
   canSetInactiveStatus = false,
 }: NovoPacienteModalProps) => {
   const [formData, setFormData] = useState<NewPatientForm>(emptyForm);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  // O aviso some assim que a pessoa mexe na escolha de pagamento.
+  useEffect(() => {
+    setPaymentError(null);
+  }, [
+    formData.payment_mode,
+    formData.payment_method,
+    formData.first_due_date,
+    formData.amount_paid,
+    formData.card_settlement,
+  ]);
   const [cepLoading, setCepLoading] = useState(false);
   const [cepError, setCepError] = useState<string | null>(null);
   const lastFetchedCep = useRef("");
@@ -510,6 +534,7 @@ export const NovoPacienteModal = ({
   useEffect(() => {
     if (isOpen) {
       setFormData(formFromPatient(patient, mode));
+      setPaymentError(null);
       setCepError(null);
       lastFetchedCep.current = "";
     }
@@ -633,7 +658,16 @@ export const NovoPacienteModal = ({
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    await onSubmit(formData);
+    if (isEditing) {
+      await onSubmit(formData);
+      return;
+    }
+
+    const paymentProblem = validatePaymentChoice(formData, financialTotal);
+    setPaymentError(paymentProblem);
+    if (paymentProblem) return;
+
+    await onSubmit(applyPaymentChoice(formData, financialTotal));
   };
 
   const toggleWeekday = (weekday: number) => {
@@ -2017,7 +2051,7 @@ export const NovoPacienteModal = ({
                     Financeiro
                   </h3>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
                         Valor por sessão
@@ -2094,38 +2128,6 @@ export const NovoPacienteModal = ({
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                        Valor pago
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        max={financialTotal}
-                        disabled={loading}
-                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none transition-all disabled:cursor-not-allowed disabled:opacity-60"
-                        value={formData.amount_paid}
-                        onWheel={preventNumberInputWheelChange}
-                        onChange={(event) => {
-                          const amountPaid = Math.max(
-                            0,
-                            Math.min(
-                              Number(event.target.value) || 0,
-                              financialTotal,
-                            ),
-                          );
-                          setFormData((current) => ({
-                            ...current,
-                            amount_paid: amountPaid,
-                            payment_status:
-                              financialTotal > 0 && amountPaid >= financialTotal
-                                ? "pago"
-                                : "pendente",
-                          }));
-                        }}
-                      />
-                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 rounded-xl border border-slate-100 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-950">
@@ -2155,69 +2157,31 @@ export const NovoPacienteModal = ({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                        Forma de pagamento
-                      </label>
-                      <div className="relative">
-                        <CreditCard
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                          size={18}
-                        />
-                        <input
-                          disabled={loading}
-                          className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none transition-all disabled:cursor-not-allowed disabled:opacity-60"
-                          placeholder="Pix, cartão..."
-                          value={formData.payment_method}
-                          onChange={(event) =>
-                            updateField("payment_method", event.target.value)
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                        Status pagamento
-                      </label>
-                      <select
-                        disabled
-                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none transition-all disabled:cursor-not-allowed disabled:opacity-60"
-                        value={formData.payment_status}
-                      >
-                        <option value="pago">Pago</option>
-                        <option value="pendente">Pendente</option>
-                      </select>
-                      <p className="text-xs text-slate-500">
-                        Definido automaticamente conforme o valor pago.
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                        Parcelas
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        disabled={loading}
-                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none transition-all disabled:cursor-not-allowed disabled:opacity-60"
-                        value={formData.installments}
-                        onWheel={preventNumberInputWheelChange}
-                        onChange={(event) =>
-                          updateField(
-                            "installments",
-                            Number(event.target.value),
-                          )
-                        }
-                      />
-                    </div>
-                  </div>
+                  <PagamentoContratacao
+                    formData={formData}
+                    setFormData={setFormData}
+                    total={financialTotal}
+                    disabled={loading}
+                  />
                 </div>
                 )}
 
                 <div className="space-y-4 rounded-2xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+                  {paymentError && (
+                    <div
+                      role="alert"
+                      className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+                    >
+                      <div className="flex gap-3">
+                        <AlertCircle size={20} className="mt-0.5 shrink-0 text-amber-600" />
+                        <div className="space-y-1">
+                          <strong className="block text-sm">Falta informar o pagamento</strong>
+                          <p>{paymentError}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {error && (
                     <div
                       role="alert"

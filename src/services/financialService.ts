@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase";
+import { isCardMachineReceivable } from "../lib/payments";
 
 export type OpenReceivable =
   | {
@@ -37,7 +38,7 @@ export async function getPatientOpenReceivables(
   const [installmentsResult, transactionsResult] = await Promise.all([
     supabase
       .from("package_installments")
-      .select("id, package_id, installment_number, amount, amount_paid, due_date")
+      .select("id, package_id, installment_number, amount, amount_paid, due_date, payment_method")
       .eq("clinic_id", clinicId)
       .eq("patient_id", patientId)
       .order("due_date", { ascending: true }),
@@ -60,7 +61,9 @@ export async function getPatientOpenReceivables(
       return {
         id: item.id,
         kind: "package" as const,
-        label: `Pacote · parcela #${item.installment_number}`,
+        label: `Pacote · parcela #${item.installment_number}${
+          isCardMachineReceivable(item.payment_method) ? " · cartão (maquininha)" : ""
+        }`,
         dueDate: item.due_date,
         amount: money(item.amount),
         remaining,
