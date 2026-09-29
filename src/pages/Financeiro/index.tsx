@@ -73,22 +73,19 @@ const FinancialTabs = () => {
 };
 
 const FinancialLayout = () => {
-  const { isPhysio, error, loading, scrollToExpense } = useFinancial();
+  const { isPhysio, error, loading, setExpenseFormOpen } = useFinancial();
   const location = useLocation();
   const navigate = useNavigate();
   const focusExpenseForm = Boolean(
     (location.state as { focusExpenseForm?: boolean } | null)?.focusExpenseForm,
   );
 
-  // "Lançar despesa" leva para a aba Despesas já rolada até o formulário.
+  // "Lançar despesa" leva para a aba Despesas com a janela de nova despesa aberta.
   useEffect(() => {
     if (loading || !focusExpenseForm) return;
-    const frame = requestAnimationFrame(() => {
-      scrollToExpense();
-      navigate(location.pathname, { replace: true, state: null });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [focusExpenseForm, loading, location.pathname, navigate, scrollToExpense]);
+    setExpenseFormOpen(true);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [focusExpenseForm, loading, location.pathname, navigate, setExpenseFormOpen]);
 
   return (
     <div className="space-y-5 sm:space-y-8 animate-in fade-in duration-500">
