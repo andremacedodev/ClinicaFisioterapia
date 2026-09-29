@@ -12,6 +12,7 @@ import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
+import { isCardMachineReceivable } from "../lib/payments";
 
 type PatientContact = {
   id: string;
@@ -33,6 +34,7 @@ type PatientContact = {
       amount: number | string;
       amount_paid: number | string;
       due_date: string;
+      payment_method?: string | null;
       status: string;
     }[];
   }[];
@@ -89,7 +91,10 @@ function getCurrentInstallment(patient: PatientContact) {
 
   return [...(activePackage.package_installments ?? [])]
     .sort((a, b) => a.installment_number - b.installment_number)
-    .find((item) => item.status !== "pago") ?? null;
+    // Parcela da maquininha do cartão não é cobrança do paciente.
+    .find(
+      (item) => item.status !== "pago" && !isCardMachineReceivable(item.payment_method),
+    ) ?? null;
 }
 
 function getRemainingInstallment(
@@ -151,6 +156,7 @@ export const WhatsApp = () => {
               amount,
               amount_paid,
               due_date,
+              payment_method,
               status
             )
           ),

@@ -142,4 +142,21 @@ export interface NewPatientForm {
   payment_method: string;
   payment_status: PaymentStatus;
   installments: number;
+  /** Como o paciente pagou (pergunta do formulário). Vazio = ainda não escolhido. */
+  payment_mode: PaymentMode | "";
+  /** Cartão de crédito: em quantas vezes passou na maquininha. */
+  card_installments: number;
+  /** Cartão de crédito: dinheiro caiu todo agora ou cai mês a mês. */
+  card_settlement: CardSettlement;
+  /** Vencimento da primeira parcela a receber. */
+  first_due_date: string;
+  /**
+   * Quem paga as parcelas geradas: o paciente ou a maquininha do cartão.
+   * Definido a partir das escolhas acima ao salvar.
+   */
+  installments_channel: InstallmentsChannel;
 }
+
+export type PaymentMode = "paid_full" | "installments" | "unpaid";
+export type CardSettlement = "now" | "monthly";
+export type InstallmentsChannel = "patient" | "card_machine";

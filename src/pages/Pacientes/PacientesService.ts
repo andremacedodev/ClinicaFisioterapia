@@ -1,4 +1,6 @@
 import { supabase } from "../../lib/supabase";
+import { CARD_MACHINE_METHOD, isCardMachineReceivable } from "../../lib/payments";
+import { addMonthsIso } from "./pagamento";
 import {
   NewPatientForm,
   OpenReceivablesSummary,
@@ -347,12 +349,12 @@ async function getOpenReceivablesByPatient(
   const [installmentsResult, transactionsResult] = await Promise.all([
     supabase
       .from(INSTALLMENTS_TABLE)
-      .select("patient_id, amount, amount_paid")
+      .select("patient_id, amount, amount_paid, payment_method")
       .eq("clinic_id", clinicId)
       .in("patient_id", patientIds),
     supabase
       .from(TRANSACTIONS_TABLE)
-      .select("patient_id, amount")
+      .select("patient_id, amount, description")
       .eq("clinic_id", clinicId)
       .in("patient_id", patientIds)
       .eq("type", "income")
@@ -384,7 +386,9 @@ async function getOpenReceivablesByPatient(
     });
   };
 
+  // Parcelas da maquininha não são dívida do paciente.
   (installmentsResult.data ?? []).forEach((installment) => {
+    if (isCardMachineReceivable(installment.payment_method)) return;
     const amount = Math.max(
       Number(installment.amount) - Number(installment.amount_paid),
       0,
@@ -392,6 +396,7 @@ async function getOpenReceivablesByPatient(
     add(installment.patient_id, amount);
   });
   (transactionsResult.data ?? []).forEach((transaction) => {
+    if (isCardMachineReceivable(transaction.description)) return;
     add(transaction.patient_id, Number(transaction.amount));
   });
 
@@ -710,11 +715,8 @@ async function sincronizarAgendamentosPacote({
   }
 }
 
-function addMonths(date: string, months: number): string {
-  const value = new Date(`${date}T12:00:00`);
-  value.setMonth(value.getMonth() + months);
-  return value.toISOString().slice(0, 10);
-}
+// Mesmo cálculo do resumo do formulário: 31/01 + 1 mês = 28/02 (não 03/03).
+const addMonths = addMonthsIso;
 
 function todayDate(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -1011,6 +1013,8 @@ function buildInstallments(
 
   if (outstandingAmount === 0) return [];
 
+  const fromCardMachine = form.installments_channel === "card_machine";
+  const firstDueDate = form.first_due_date || form.plan_start_date;
   const baseAmount = Math.floor((outstandingAmount / count) * 100) / 100;
   let remainingTotal = outstandingAmount;
 
@@ -1028,9 +1032,14 @@ function buildInstallments(
       installment_number: index + 1,
       amount,
       amount_paid: amountPaid,
-      due_date: addMonths(form.plan_start_date, index),
+      due_date: addMonths(firstDueDate, index),
       paid_at: amountPaid >= amount ? new Date().toISOString() : null,
-      payment_method: amountPaid > 0 ? emptyToNull(form.payment_method) : null,
+      // Parcela da maquininha: o paciente já pagou; só falta o dinheiro cair.
+      payment_method: fromCardMachine
+        ? CARD_MACHINE_METHOD
+        : amountPaid > 0
+          ? emptyToNull(form.payment_method)
+          : null,
       status: installmentStatus(amount, amountPaid),
     };
   });
@@ -1160,6 +1169,15 @@ async function registrarRecebimentoInicial({
   }
 }
 
+/** Divide um valor em parcelas iguais; a última absorve os centavos. */
+function splitPendingAmount(total: number, count: number): number[] {
+  if (total <= 0) return [];
+  const base = Math.floor((total / count) * 100) / 100;
+  return Array.from({ length: count }, (_, index) =>
+    index === count - 1 ? Number((total - base * (count - 1)).toFixed(2)) : base,
+  );
+}
+
 async function registrarFinanceiroProcedimentosAvulsos({
   clinicId,
   patientId,
@@ -1169,6 +1187,9 @@ async function registrarFinanceiroProcedimentosAvulsos({
   paymentMethod,
   isRenewal = false,
   replaceExisting = false,
+  installments = 1,
+  firstDueDate,
+  fromCardMachine = false,
 }: {
   clinicId: string;
   patientId: string;
@@ -1178,6 +1199,11 @@ async function registrarFinanceiroProcedimentosAvulsos({
   paymentMethod: string;
   isRenewal?: boolean;
   replaceExisting?: boolean;
+  /** Em quantas parcelas o saldo fica em aberto. */
+  installments?: number;
+  firstDueDate?: string;
+  /** Saldo é da maquininha do cartão, não do paciente. */
+  fromCardMachine?: boolean;
 }) {
   if (replaceExisting) {
     const { error: deleteError } = await supabase
@@ -1217,18 +1243,22 @@ async function registrarFinanceiroProcedimentosAvulsos({
           due_date: paymentDate,
         }
       : null,
-    pendingAmount > 0
-      ? {
+    ...splitPendingAmount(pendingAmount, Math.max(Number(installments) || 1, 1)).map(
+      (amount, index, parts) => {
+        const parcel = parts.length > 1 ? ` · parcela ${index + 1}/${parts.length}` : "";
+        const channel = fromCardMachine ? ` · ${CARD_MACHINE_METHOD}` : "";
+        return {
           clinic_id: clinicId,
           patient_id: patientId,
-          amount: pendingAmount,
+          amount,
           type: "income",
           category: "Recebimento de procedimentos",
           status: "pending",
-          description: `${baseDescription} - saldo em aberto`,
-          due_date: paymentDate,
-        }
-      : null,
+          description: `${baseDescription}${parcel}${channel} - saldo em aberto`,
+          due_date: addMonths(firstDueDate || paymentDate, index),
+        };
+      },
+    ),
   ].filter((row): row is TransactionInsert => Boolean(row));
 
   if (rows.length === 0) return;
@@ -1370,6 +1400,9 @@ export async function criarPaciente(
       totalAmount,
       amountPaid,
       paymentMethod: form.payment_method,
+      installments: form.installments,
+      firstDueDate: form.first_due_date,
+      fromCardMachine: form.installments_channel === "card_machine",
     });
 
     return {
@@ -1520,6 +1553,9 @@ export async function renovarPacotePaciente(
       amountPaid,
       paymentMethod: form.payment_method,
       isRenewal: true,
+      installments: form.installments,
+      firstDueDate: form.first_due_date,
+      fromCardMachine: form.installments_channel === "card_machine",
     });
 
     return {
