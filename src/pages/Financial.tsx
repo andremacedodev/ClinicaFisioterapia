@@ -22,6 +22,7 @@ import * as XLSX from "xlsx";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
+import { StorageFileLink } from "../components/ui/StorageFileLink";
 import { useAuth } from "../context/AuthContext";
 import {
   buildCommissionDetailReport,
@@ -289,8 +290,8 @@ async function uploadTransactionDocument(
     throw new Error(`Erro no upload do documento: ${uploadError.message}`);
   }
 
-  const { data } = supabase.storage.from("transaction-docs").getPublicUrl(path);
-  return data.publicUrl;
+  // O bucket é privado: guardamos o caminho e geramos link assinado ao abrir.
+  return path;
 }
 
 function startOfMonth(date: Date): Date {
@@ -3234,14 +3235,13 @@ export const Financial = () => {
                               </td>
                               <td className="px-6 py-4 text-sm text-slate-500" data-label="Documento">
                                 {transaction.attachments?.[0] ? (
-                                  <a
-                                    href={transaction.attachments[0]}
-                                    target="_blank"
-                                    rel="noreferrer noopener"
+                                  <StorageFileLink
+                                    bucket="transaction-docs"
+                                    value={transaction.attachments[0]}
                                     className="text-brand-600 hover:underline"
                                   >
                                     Ver documento
-                                  </a>
+                                  </StorageFileLink>
                                 ) : (
                                   "-"
                                 )}
@@ -3556,14 +3556,13 @@ export const Financial = () => {
                           </td>
                           <td className="px-6 py-4 text-sm text-slate-500" data-label="Documento">
                             {transaction.attachments?.[0] ? (
-                              <a
-                                href={transaction.attachments[0]}
-                                target="_blank"
-                                rel="noreferrer noopener"
+                              <StorageFileLink
+                                bucket="transaction-docs"
+                                value={transaction.attachments[0]}
                                 className="text-brand-600 hover:underline"
                               >
                                 Ver documento
-                              </a>
+                              </StorageFileLink>
                             ) : (
                               "-"
                             )}

@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
+import { StorageFileLink } from "../components/ui/StorageFileLink";
+import { storageFileName } from "../lib/storageFiles";
 import {
   ArrowLeft,
   Mic,
@@ -1064,20 +1066,16 @@ export const ClinicalHub = () => {
                                   ev.attachments.length > 0 && (
                                     <div className="mt-3 flex flex-wrap gap-2">
                                       {ev.attachments.map((url, i) => (
-                                        <a
+                                        <StorageFileLink
                                           key={i}
-                                          href={url}
-                                          target="_blank"
-                                          rel="noreferrer"
+                                          bucket="patient-files"
+                                          value={url}
                                           className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-brand-600 hover:bg-brand-50 transition-colors"
                                         >
                                           <Paperclip size={11} />
-                                          {url
-                                            .split("/")
-                                            .pop()
-                                            ?.replace(/^\d+_/, "") ??
+                                          {storageFileName(url) ||
                                             `Arquivo ${i + 1}`}
-                                        </a>
+                                        </StorageFileLink>
                                       ))}
                                     </div>
                                   )}
@@ -1445,23 +1443,23 @@ export const ClinicalHub = () => {
                             </p>
                           </div>
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <a
-                              href={doc.url}
-                              target="_blank"
-                              rel="noreferrer"
+                            <StorageFileLink
+                              bucket="patient-files"
+                              value={doc.url}
                               className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-brand-600 transition-colors"
                               title="Abrir"
                             >
                               <ExternalLink size={15} />
-                            </a>
-                            <a
-                              href={doc.url}
+                            </StorageFileLink>
+                            <StorageFileLink
+                              bucket="patient-files"
+                              value={doc.url}
                               download
                               className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-brand-600 transition-colors"
                               title="Download"
                             >
                               <Download size={15} />
-                            </a>
+                            </StorageFileLink>
                           </div>
                         </div>
                       ))}

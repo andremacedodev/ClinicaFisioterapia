@@ -1,3 +1,5 @@
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+
 type BorrowerType = "NaturalPerson" | "LegalEntity";
 
 type BorrowerAddress = {
@@ -149,25 +151,19 @@ Deno.serve(async (request) => {
     return json({ message: "Metodo nao permitido." }, 405);
   }
 
-  const requireAuth = Deno.env.get("NFEIO_REQUIRE_AUTH") !== "false";
-  const authorization = request.headers.get("Authorization");
-  if (requireAuth && !authorization?.startsWith("Bearer ")) {
-    return json({ message: "Sessao autenticada obrigatoria para emitir NFS-e." }, 401);
-  }
-
   const apiKey = Deno.env.get("NFEIO_API_KEY") ?? Deno.env.get("NFEIO_INVOICE_KEY");
-  const companyId = Deno.env.get("NFEIO_COMPANY_ID");
   const baseUrl = trimTrailingSlash(Deno.env.get("NFEIO_BASE_URL") ?? "https://api.nfe.io");
 
-  if (!apiKey || !companyId) {
+  if (!apiKey) {
     return json(
-      {
-        message:
-          "Segredos NFEIO_API_KEY e NFEIO_COMPANY_ID nao configurados na Edge Function.",
-      },
+      { message: "Segredo NFEIO_API_KEY nao configurado na Edge Function." },
       500,
     );
   }
+
+  const tenant = await resolveTenant(request);
+  if (tenant instanceof Response) return tenant;
+  const { companyId, db } = tenant;
 
   const payload = (await request.json().catch(() => null)) as
     | InvoiceRequest
@@ -175,6 +171,15 @@ Deno.serve(async (request) => {
     | null;
 
   if (isInvoiceAction(payload)) {
+    // A nota precisa pertencer à clínica do usuário (RLS de service_invoices).
+    if (db) {
+      const { data: ownInvoice } = await db
+        .from("service_invoices")
+        .select("id")
+        .eq("provider_invoice_id", payload.providerInvoiceId?.trim() ?? "")
+        .maybeSingle();
+      if (!ownInvoice) return json({ message: "NFS-e nao encontrada." }, 404);
+    }
     return handleInvoiceAction(payload, { apiKey, companyId, baseUrl });
   }
 
@@ -279,6 +284,72 @@ Deno.serve(async (request) => {
     rawResponse: data,
   });
 });
+
+type Tenant = { companyId: string; db: SupabaseClient | null };
+
+/**
+ * Valida o usuário logado e descobre a empresa NFe.io da clínica dele.
+ * Cada clínica emite no próprio CNPJ (clinics.nfeio_company_id).
+ */
+async function resolveTenant(request: Request): Promise<Tenant | Response> {
+  // Só para testes locais sem Supabase Auth.
+  if (Deno.env.get("NFEIO_REQUIRE_AUTH") === "false") {
+    const companyId = Deno.env.get("NFEIO_COMPANY_ID");
+    if (!companyId) {
+      return json({ message: "NFEIO_COMPANY_ID nao configurado." }, 500);
+    }
+    return { companyId, db: null };
+  }
+
+  const authorization = request.headers.get("Authorization") ?? "";
+  const token = authorization.replace(/^Bearer\s+/i, "");
+  if (!token || token === authorization) {
+    return json({ message: "Sessao autenticada obrigatoria para emitir NFS-e." }, 401);
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return json({ message: "SUPABASE_URL/SUPABASE_ANON_KEY indisponiveis." }, 500);
+  }
+
+  // Cliente com o token do usuário: todas as leituras passam pela RLS.
+  const db = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const { data: userData, error: userError } = await db.auth.getUser(token);
+  if (userError || !userData.user) {
+    return json({ message: "Sessao invalida ou expirada." }, 401);
+  }
+
+  const { data: profile, error: profileError } = await db
+    .from("profiles")
+    .select("clinic_id, clinics(nfeio_company_id)")
+    .eq("id", userData.user.id)
+    .maybeSingle();
+
+  if (profileError || !profile?.clinic_id) {
+    return json({ message: "Usuario sem clinica vinculada." }, 403);
+  }
+
+  const clinic = Array.isArray(profile.clinics) ? profile.clinics[0] : profile.clinics;
+  const companyId = (clinic as { nfeio_company_id?: string | null } | null)
+    ?.nfeio_company_id?.trim();
+
+  if (!companyId) {
+    return json(
+      {
+        message:
+          "Esta clinica ainda nao tem empresa NFe.io configurada (clinics.nfeio_company_id).",
+      },
+      412,
+    );
+  }
+
+  return { companyId, db };
+}
 
 async function handleInvoiceAction(
   payload: InvoiceActionRequest,

@@ -26,7 +26,28 @@ type ProfessionalOption = {
   id: string;
   full_name: string;
   role: string | null;
+  professional_registry?: string | null;
 };
+
+async function loadProfessionals(clinicId: string) {
+  const result = await supabase
+    .from("profiles")
+    .select("id, full_name, role, professional_registry")
+    .eq("clinic_id", clinicId)
+    .in("role", ["admin", "physio"])
+    .order("full_name", { ascending: true });
+
+  // Compatível com bancos que ainda não receberam a coluna nova
+  if (result.error?.message.includes("professional_registry")) {
+    return supabase
+      .from("profiles")
+      .select("id, full_name, role")
+      .eq("clinic_id", clinicId)
+      .in("role", ["admin", "physio"])
+      .order("full_name", { ascending: true });
+  }
+  return result;
+}
 
 type ClinicInfo = {
   name: string;
@@ -86,6 +107,26 @@ export const Certificates = () => {
   const [searchParams] = useSearchParams();
   const [patients, setPatients] = useState<PatientOption[]>([]);
   const [professionals, setProfessionals] = useState<ProfessionalOption[]>([]);
+
+  const saveOwnRegistry = async (professionalId: string, registry: string) => {
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ professional_registry: registry || null })
+      .eq("id", professionalId);
+
+    if (updateError) {
+      console.warn("Não foi possível salvar o registro profissional:", updateError);
+      return;
+    }
+
+    setProfessionals((current) =>
+      current.map((item) =>
+        item.id === professionalId
+          ? { ...item, professional_registry: registry || null }
+          : item,
+      ),
+    );
+  };
   const [clinic, setClinic] = useState<ClinicInfo | null>(null);
   const [patientId, setPatientId] = useState(
     searchParams.get("patientId") ?? "",
@@ -137,12 +178,7 @@ export const Certificates = () => {
             .select("id, full_name, cpf")
             .eq("clinic_id", profile.clinic_id)
             .order("full_name", { ascending: true }),
-          supabase
-            .from("profiles")
-            .select("id, full_name, role")
-            .eq("clinic_id", profile.clinic_id)
-            .in("role", ["admin", "physio"])
-            .order("full_name", { ascending: true }),
+          loadProfessionals(profile.clinic_id),
         ]);
 
       if (!active) return;
@@ -192,12 +228,10 @@ export const Certificates = () => {
     setPatientSearch(patientOptionLabel(selectedPatient));
   }, [selectedPatient]);
 
-  // Auto-preencher CREFITO de Cristiane Carrasco
+  // Preenche o registro salvo no cadastro do profissional
   useEffect(() => {
     if (!selectedProfessional) return;
-    if (selectedProfessional.full_name.toLowerCase().includes("cristiane")) {
-      setProfessionalRegistry("26235/MT");
-    }
+    setProfessionalRegistry(selectedProfessional.professional_registry ?? "");
   }, [selectedProfessional]);
 
   const findPatientBySearch = (value: string): PatientOption | undefined => {
@@ -256,6 +290,14 @@ export const Certificates = () => {
     const clinicName = clinic?.name ?? "Clínica";
     const professionalName = selectedProfessional.full_name;
     const registry = professionalRegistry.trim();
+
+    // Cada profissional só pode editar o próprio cadastro (RLS).
+    if (
+      selectedProfessional.id === profile?.id &&
+      registry !== (selectedProfessional.professional_registry ?? "")
+    ) {
+      void saveOwnRegistry(selectedProfessional.id, registry);
+    }
 
     receiptWindow.document.write(`
       <!doctype html>

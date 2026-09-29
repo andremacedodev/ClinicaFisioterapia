@@ -11,6 +11,7 @@ export const ptBR = {
     invoices: "Notas Fiscais",
     whatsapp: "WhatsApp",
     team: "Equipe",
+    settings: "Configurações",
     logout: "Sair",
   },
   agenda: {

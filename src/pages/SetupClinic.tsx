@@ -116,20 +116,29 @@ export const SetupClinic = () => {
     setLoading(true);
     setError(null);
 
-    const clinicSlug = slugify(clinicName);
+    const baseSlug = slugify(clinicName);
+    const insertClinic = (slug: string) =>
+      supabase
+        .from("clinics")
+        .insert({
+          name: clinicName.trim(),
+          slug,
+          owner_id: user.id,
+        })
+        .select("id")
+        .single();
 
-    const { data: clinic, error: clinicError } = await supabase
-      .from("clinics")
-      .insert({
-        name: clinicName.trim(),
-        slug: clinicSlug,
-        owner_id: user.id,
-      })
-      .select("id")
-      .single();
+    // Outra clínica pode já usar o mesmo nome: tenta de novo com sufixo.
+    let { data: clinic, error: clinicError } = await insertClinic(baseSlug);
+    for (let attempt = 0; clinicError?.code === "23505" && attempt < 3; attempt++) {
+      const suffix = Math.random().toString(36).slice(2, 6);
+      ({ data: clinic, error: clinicError } = await insertClinic(
+        `${baseSlug}-${suffix}`,
+      ));
+    }
 
-    if (clinicError) {
-      setError(`Erro ao criar clínica: ${clinicError.message}`);
+    if (clinicError || !clinic) {
+      setError(`Erro ao criar clínica: ${clinicError?.message ?? "tente novamente."}`);
       setLoading(false);
       return;
     }
