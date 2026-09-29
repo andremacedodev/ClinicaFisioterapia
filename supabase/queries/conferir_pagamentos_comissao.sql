@@ -3,6 +3,7 @@
 --
 -- pago_em / valor ......... o pagamento como está hoje
 -- sera_atribuido_a ........ profissional que a migration vai associar
+--                           (não identificado: você escolhe na revisão)
 -- hoje_conta_para ......... para quem o cálculo atual está contando esse
 --                           pagamento (mais de um nome = contado em dobro)
 -- mes_seguinte_ao_trabalho  dica: pagamentos feitos até o dia 10 costumam
@@ -14,7 +15,7 @@ select
     por_id.full_name,
     por_nome.full_name,
     case when hoje.quantidade = 1 then hoje.nomes end,
-    'NÃO IDENTIFICADO (não será migrado)'
+    'NÃO IDENTIFICADO (você escolhe na revisão)'
   ) as sera_atribuido_a,
   hoje.nomes as hoje_conta_para,
   extract(day from t.due_date) <= 10 as mes_seguinte_ao_trabalho,

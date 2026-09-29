@@ -13,13 +13,17 @@
   ligada ao pagamento; excluir a despesa exclui o pagamento.
 
   Pagamentos antigos são migrados como referentes ao mês em que foram pagos
-  (os números exibidos continuam iguais) e ficam marcados para revisão.
+  (os números exibidos continuam iguais) e ficam marcados para revisão. Os
+  que não têm profissional identificável também entram, sem profissional,
+  para a administradora escolher na revisão (hoje eles não contam para
+  ninguém, e continuam não contando até serem revisados).
 */
 
 CREATE TABLE IF NOT EXISTS public.commission_payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   clinic_id UUID NOT NULL REFERENCES public.clinics(id) ON DELETE CASCADE,
-  professional_id UUID NOT NULL REFERENCES public.profiles(id),
+  -- Vazio só em pagamento antigo sem profissional identificado (vai para revisão).
+  professional_id UUID REFERENCES public.profiles(id),
   period_start DATE NOT NULL,
   period_end DATE NOT NULL,
   amount NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
@@ -28,7 +32,8 @@ CREATE TABLE IF NOT EXISTS public.commission_payments (
   needs_review BOOLEAN NOT NULL DEFAULT false,
   created_by UUID DEFAULT auth.uid(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CHECK (period_end >= period_start)
+  CHECK (period_end >= period_start),
+  CHECK (professional_id IS NOT NULL OR needs_review)
 );
 
 CREATE INDEX IF NOT EXISTS commission_payments_clinic_professional_period_idx
@@ -126,7 +131,9 @@ GRANT EXECUTE ON FUNCTION public.register_commission_payment(UUID, DATE, DATE, N
 --   1. ID entre parênteses na descrição;
 --   2. descrição exatamente "Pagamento de comissão para <nome>" (nome único);
 --   3. a única profissional cujo nome ou ID aparece na descrição (a mesma
---      regra que o relatório usava; se aparecer mais de uma, não migra).
+--      regra que o relatório usava).
+-- Sem profissional identificado (ou com mais de uma possível), entra vazio
+-- para revisão.
 INSERT INTO public.commission_payments (
   clinic_id, professional_id, period_start, period_end, amount, paid_at, transaction_id, needs_review, created_at
 )
@@ -172,7 +179,6 @@ WHERE t.type = 'expense'
   AND t.category = 'Comissão fisioterapeuta'
   AND t.status = 'paid'
   AND t.amount > 0
-  AND matched.professional_id IS NOT NULL
   AND NOT EXISTS (
     SELECT 1 FROM public.commission_payments cp WHERE cp.transaction_id = t.id
   );

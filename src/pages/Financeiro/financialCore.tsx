@@ -100,7 +100,8 @@ export type CommissionDetailRow = {
 
 export type CommissionPayment = {
   id: string;
-  professional_id: string;
+  /** Vazio em pagamento antigo sem profissional identificado (em revisão). */
+  professional_id: string | null;
   period_start: string;
   period_end: string;
   amount: number | string;
@@ -108,6 +109,7 @@ export type CommissionPayment = {
   needs_review: boolean;
   transaction_id: string | null;
   profiles: { full_name: string } | null;
+  description: string | null;
 };
 
 /**
@@ -120,7 +122,7 @@ export async function fetchCommissionPayments(
   const { data, error } = await supabase
     .from("commission_payments")
     .select(
-      "id, professional_id, period_start, period_end, amount, paid_at, needs_review, transaction_id, profiles (full_name)",
+      "id, professional_id, period_start, period_end, amount, paid_at, needs_review, transaction_id, profiles (full_name), transactions (description)",
     )
     .eq("clinic_id", clinicId)
     .order("paid_at", { ascending: false });
@@ -135,7 +137,16 @@ export async function fetchCommissionPayments(
       : { supported: true, payments: [], error: error.message };
   }
 
-  return { supported: true, payments: (data ?? []) as unknown as CommissionPayment[] };
+  const rows = (data ?? []) as unknown as (Omit<CommissionPayment, "description"> & {
+    transactions: { description: string | null } | null;
+  })[];
+  return {
+    supported: true,
+    payments: rows.map(({ transactions, ...payment }) => ({
+      ...payment,
+      description: transactions?.description ?? null,
+    })),
+  };
 }
 
 export function monthRange(date: string): { startDate: string; endDate: string } {
@@ -2186,10 +2197,11 @@ export function useFinancialController() {
     await loadFinancialData();
   };
 
-  // Revisão dos pagamentos migrados: define a qual mês cada um se refere.
-  const handleConfirmCommissionPaymentPeriod = async (
+  // Revisão dos pagamentos migrados: define profissional e mês de referência.
+  const handleConfirmCommissionPayment = async (
     payment: CommissionPayment,
     referenceMonth: string,
+    professionalId: string,
   ) => {
     const period = monthRange(`${referenceMonth}-01`);
     setSaving(true);
@@ -2198,6 +2210,7 @@ export function useFinancialController() {
     const { error: updateError } = await supabase
       .from("commission_payments")
       .update({
+        professional_id: professionalId,
         period_start: period.startDate,
         period_end: period.endDate,
         needs_review: false,
@@ -2215,6 +2228,7 @@ export function useFinancialController() {
         item.id === payment.id
           ? {
               ...item,
+              professional_id: professionalId,
               period_start: period.startDate,
               period_end: period.endDate,
               needs_review: false,
@@ -2698,7 +2712,7 @@ export function useFinancialController() {
     commissionPaidAt,
     setCommissionPaidAt,
     openCommissionPayment,
-    handleConfirmCommissionPaymentPeriod,
+    handleConfirmCommissionPayment,
     profile,
     clinicProfile,
     setClinicProfile,
