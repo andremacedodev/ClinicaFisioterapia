@@ -188,7 +188,8 @@ export type TransactionStatus = TransactionRow["status"];
 
 export type ReceivableFilter = "open" | "card" | "paid" | "all";
 export type DueSort = "asc" | "desc";
-export type ExpenseViewFilter = "period" | "payable";
+/** A pagar (próximos dias e vencidas), pagas no período ou todas do período. */
+export type ExpenseViewFilter = "payable" | "paid" | "period";
 export type ExpenseReminderTone = "overdue" | "today" | "soon";
 
 export type FinancialReportSections = {
@@ -690,7 +691,8 @@ export function useFinancialController() {
     useState<ReceivableFilter>("open");
   const [dueSort, setDueSort] = useState<DueSort>("asc");
   const [expenseViewFilter, setExpenseViewFilter] =
-    useState<ExpenseViewFilter>("period");
+    useState<ExpenseViewFilter>("payable");
+  const [expenseFormOpen, setExpenseFormOpen] = useState(false);
   const [patientSearchTerm, setPatientSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1208,6 +1210,8 @@ export function useFinancialController() {
         if (expenseEndDate && transaction.due_date > expenseEndDate) {
           return false;
         }
+
+        if (expenseViewFilter === "paid") return transaction.status === "paid";
 
         return true;
       }),
@@ -1942,7 +1946,10 @@ export function useFinancialController() {
       return;
     }
 
+    // Mostra a despesa onde ela foi parar: paga → "Pagas"; senão → "A pagar".
+    setExpenseViewFilter(expenseForm.status === "paid" ? "paid" : "payable");
     setExpenseForm(initialExpenseForm());
+    setExpenseFormOpen(false);
     setSaving(false);
     await loadFinancialData();
   };
@@ -2357,6 +2364,8 @@ export function useFinancialController() {
 
 
   return {
+    expenseFormOpen,
+    setExpenseFormOpen,
     legacyCardPackages,
     overdueCardReceivables,
     openLegacyCardSettlement,
