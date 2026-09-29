@@ -1,9 +1,20 @@
 {
-  "name": "Biofisio",
+  "name": "Biofisio · Gestão para clínicas de fisioterapia",
   "short_name": "Biofisio",
+  "description": "Agenda, prontuário, financeiro e notas fiscais para clínicas de fisioterapia e pilates.",
+  "lang": "pt-BR",
+  "start_url": "/",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
   ],
   "theme_color": "#FFFBF4",
   "background_color": "#FFFBF4",
