@@ -11,7 +11,7 @@ import { Sidebar } from "./components/layout/Sidebar";
 import { Dashboard } from "./pages/Dashboard";
 import { Agenda } from "./pages/Agenda";
 import { Patients } from "./pages/Pacientes";
-import { Financial } from "./pages/Financial";
+import { Financial } from "./pages/Financeiro";
 import { ServiceInvoices } from "./pages/ServiceInvoices";
 import { WhatsApp } from "./pages/WhatsApp";
 import { Team } from "./pages/Team";
@@ -28,7 +28,7 @@ const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const [showBackToTop, setShowBackToTop] = useState(false);
   const canShowBackToTop =
-    location.pathname === "/financeiro" || location.pathname === "/pacientes";
+    location.pathname.startsWith("/financeiro") || location.pathname === "/pacientes";
 
   useEffect(() => {
     if (!canShowBackToTop) {
@@ -124,7 +124,7 @@ function App() {
             }
           />
           <Route
-            path="/financeiro"
+            path="/financeiro/*"
             element={
               <ProtectedLayout>
                 <Financial />
