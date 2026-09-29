@@ -1,44 +1,20 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { clsx } from "clsx";
-import {
-  AlertTriangle,
-  ArrowUpDown,
-  ArrowDownCircle,
-  Check,
-  DollarSign,
-  FileDown,
-  Filter,
-  Loader2,
-  PlusCircle,
-  Receipt,
-  Search,
-  TrendingUp,
-  Trash2,
-  UserCheck,
-  X,
-} from "lucide-react";
+/*
+  Estado, carregamento e ações do Financeiro, compartilhados pelas abas.
+  A lógica veio de src/pages/Financial.tsx sem alterações.
+*/
+import { supabase } from "../../lib/supabase";
 import * as XLSX from "xlsx";
-import { Badge } from "../components/ui/Badge";
-import { Button } from "../components/ui/Button";
-import { Card } from "../components/ui/Card";
-import { StorageFileLink } from "../components/ui/StorageFileLink";
-import { useAuth } from "../context/AuthContext";
-import {
-  buildCommissionDetailReport,
-  buildCommissionReport,
-} from "../lib/commission";
-import { supabase } from "../lib/supabase";
-import {
-  CLINIC_HEADER_CSS,
-  ClinicProfile,
-  clinicHeaderHtml,
-  fetchClinicProfile,
-} from "../lib/clinicProfile";
+import { useAuth } from "../../context/AuthContext";
+import { ChangeEvent, FormEvent, ReactNode, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { CLINIC_HEADER_CSS, ClinicProfile, clinicHeaderHtml, fetchClinicProfile } from "../../lib/clinicProfile";
+import { buildCommissionDetailReport, buildCommissionReport } from "../../lib/commission";
+import { TrendingUp } from "lucide-react";
+import { Card } from "../../components/ui/Card";
+import { clsx } from "clsx";
 
-type PaymentStatus = "pago" | "pendente";
+export type PaymentStatus = "pago" | "pendente";
 
-type InstallmentRow = {
+export type InstallmentRow = {
   id: string;
   installment_number: number;
   amount: number | string;
@@ -49,7 +25,7 @@ type InstallmentRow = {
   status: PaymentStatus;
 };
 
-type PackageRow = {
+export type PackageRow = {
   id: string;
   patient_id: string;
   total_lessons: number;
@@ -74,7 +50,7 @@ type PackageRow = {
   package_installments: InstallmentRow[];
 };
 
-type CommissionAppointment = {
+export type CommissionAppointment = {
   id: string;
   patient_id: string | null;
   package_id: string | null;
@@ -96,7 +72,7 @@ type CommissionAppointment = {
   } | null;
 };
 
-type ProfessionalReport = {
+export type ProfessionalReport = {
   professionalId: string;
   professionalName: string;
   heldClasses: number;
@@ -106,7 +82,7 @@ type ProfessionalReport = {
   commissionPaid: number;
 };
 
-type CommissionDetailRow = {
+export type CommissionDetailRow = {
   professionalId: string;
   professionalName: string;
   patientId: string;
@@ -122,7 +98,7 @@ type CommissionDetailRow = {
   totalCommission: number;
 };
 
-type TransactionRow = {
+export type TransactionRow = {
   id: string;
   patient_id: string | null;
   package_id: string | null;
@@ -141,20 +117,20 @@ type TransactionRow = {
   } | null;
 };
 
-type TransactionStatus = TransactionRow["status"];
+export type TransactionStatus = TransactionRow["status"];
 
-type ReceivableFilter = "open" | "paid" | "all";
-type DueSort = "asc" | "desc";
-type ExpenseViewFilter = "period" | "payable";
-type ExpenseReminderTone = "overdue" | "today" | "soon";
+export type ReceivableFilter = "open" | "paid" | "all";
+export type DueSort = "asc" | "desc";
+export type ExpenseViewFilter = "period" | "payable";
+export type ExpenseReminderTone = "overdue" | "today" | "soon";
 
-type FinancialReportSections = {
+export type FinancialReportSections = {
   payable: boolean;
   paid: boolean;
   receipts: boolean;
 };
 
-type ExpenseFormState = {
+export type ExpenseFormState = {
   amount: string;
   category: string;
   description: string;
@@ -163,7 +139,7 @@ type ExpenseFormState = {
   document: File | null;
 };
 
-type ReceivableRow = {
+export type ReceivableRow = {
   kind: "package";
   packageItem: PackageRow;
   installment: InstallmentRow;
@@ -173,7 +149,7 @@ type ReceivableRow = {
   status: PaymentStatus;
 };
 
-type ProcedureReceivableRow = {
+export type ProcedureReceivableRow = {
   kind: "procedure";
   transaction: TransactionRow;
   patientName: string;
@@ -182,7 +158,7 @@ type ProcedureReceivableRow = {
   status: PaymentStatus;
 };
 
-type PackageReceiptReceivableRow = {
+export type PackageReceiptReceivableRow = {
   kind: "package_receipt";
   transaction: TransactionRow;
   patientName: string;
@@ -191,12 +167,12 @@ type PackageReceiptReceivableRow = {
   status: PaymentStatus;
 };
 
-type ReceivableItem =
+export type ReceivableItem =
   | ReceivableRow
   | ProcedureReceivableRow
   | PackageReceiptReceivableRow;
 
-type PaymentTarget =
+export type PaymentTarget =
   | {
       kind: "package";
       packageItem: PackageRow;
@@ -207,24 +183,24 @@ type PaymentTarget =
       transaction: TransactionRow;
     };
 
-const currencyFormatter = new Intl.NumberFormat("pt-BR", {
+export const currencyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
 });
 
-const paymentLabel: Record<PaymentStatus, string> = {
+export const paymentLabel: Record<PaymentStatus, string> = {
   pago: "Pago",
   pendente: "Pendente",
 };
 
-const transactionStatusLabel: Record<TransactionStatus, string> = {
+export const transactionStatusLabel: Record<TransactionStatus, string> = {
   paid: "Pago",
   pending: "Pendente",
   overdue: "Vencido",
   cancelled: "Cancelado",
 };
 
-const expenseCategories = [
+export const expenseCategories = [
   "Aluguel",
   "Comissão fisioterapeuta",
   "Material clínico",
@@ -238,10 +214,10 @@ const expenseCategories = [
   "Outros",
 ];
 
-const expenseReminderDays = 7;
-const expensePayableWindowDays = 30;
+export const expenseReminderDays = 7;
+export const expensePayableWindowDays = 30;
 
-const initialExpenseForm = (): ExpenseFormState => ({
+export const initialExpenseForm = (): ExpenseFormState => ({
   amount: "",
   category: "Outros",
   description: "",
@@ -250,15 +226,15 @@ const initialExpenseForm = (): ExpenseFormState => ({
   document: null,
 });
 
-function money(value: number | string | null | undefined): number {
+export function money(value: number | string | null | undefined): number {
   return Number(value) || 0;
 }
 
-function cents(value: number | string | null | undefined): number {
+export function cents(value: number | string | null | undefined): number {
   return Math.round(money(value) * 100);
 }
 
-function formatBRLValue(value: string | number | null | undefined): string {
+export function formatBRLValue(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === "") return "";
 
   const digits = String(value).replace(/\D/g, "");
@@ -272,7 +248,7 @@ function formatBRLValue(value: string | number | null | undefined): string {
   return currencyFormatter.format(amount);
 }
 
-function parseCurrencyValue(value: string): string {
+export function parseCurrencyValue(value: string): string {
   const digits = value.replace(/\D/g, "");
   if (!digits) return "";
 
@@ -283,7 +259,7 @@ function parseCurrencyValue(value: string): string {
   return digits.slice(0, -2) + "." + digits.slice(-2);
 }
 
-async function uploadTransactionDocument(
+export async function uploadTransactionDocument(
   clinicId: string,
   file: File,
 ): Promise<string> {
@@ -300,32 +276,32 @@ async function uploadTransactionDocument(
   return path;
 }
 
-function startOfMonth(date: Date): Date {
+export function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
-function nextMonth(date: Date): Date {
+export function nextMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth() + 1, 1);
 }
 
-function parseDateInput(value: string): Date {
+export function parseDateInput(value: string): Date {
   return new Date(`${value}T12:00:00`);
 }
 
-function toDateInputValue(date: Date): string {
+export function toDateInputValue(date: Date): string {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
   const day = `${date.getDate()}`.padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
-function addDays(date: Date, days: number): Date {
+export function addDays(date: Date, days: number): Date {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next;
 }
 
-function daysBetweenInclusive(startDate: string, endDate: string): number {
+export function daysBetweenInclusive(startDate: string, endDate: string): number {
   const start = parseDateInput(startDate);
   const end = parseDateInput(endDate);
   return (
@@ -333,7 +309,7 @@ function daysBetweenInclusive(startDate: string, endDate: string): number {
   );
 }
 
-function listDateRange(startDate: string, endDate: string): string[] {
+export function listDateRange(startDate: string, endDate: string): string[] {
   const days = Math.max(Math.min(daysBetweenInclusive(startDate, endDate), 31), 0);
   const start = parseDateInput(startDate);
 
@@ -342,11 +318,11 @@ function listDateRange(startDate: string, endDate: string): string[] {
   );
 }
 
-function formatDate(date: string): string {
+export function formatDate(date: string): string {
   return new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR");
 }
 
-function escapeHtml(value: string | null | undefined): string {
+export function escapeHtml(value: string | null | undefined): string {
   return (value ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -355,7 +331,7 @@ function escapeHtml(value: string | null | undefined): string {
     .replace(/'/g, "&#039;");
 }
 
-function formatShortDate(date: string): string {
+export function formatShortDate(date: string): string {
   return new Date(`${date}T12:00:00`)
     .toLocaleDateString("pt-BR", {
       day: "2-digit",
@@ -364,7 +340,7 @@ function formatShortDate(date: string): string {
     .replace(".", "");
 }
 
-function getDefaultCommissionPeriod(): { startDate: string; endDate: string } {
+export function getDefaultCommissionPeriod(): { startDate: string; endDate: string } {
   const monthStart = startOfMonth(new Date());
   const monthEnd = addDays(nextMonth(monthStart), -1);
 
@@ -374,7 +350,7 @@ function getDefaultCommissionPeriod(): { startDate: string; endDate: string } {
   };
 }
 
-function getDefaultExpensePeriod(): { startDate: string; endDate: string } {
+export function getDefaultExpensePeriod(): { startDate: string; endDate: string } {
   const today = new Date();
 
   return {
@@ -383,7 +359,7 @@ function getDefaultExpensePeriod(): { startDate: string; endDate: string } {
   };
 }
 
-function statusFromPayment(total: number, paid: number): PaymentStatus {
+export function statusFromPayment(total: number, paid: number): PaymentStatus {
   const totalCents = cents(total);
   const paidCents = cents(paid);
 
@@ -392,13 +368,13 @@ function statusFromPayment(total: number, paid: number): PaymentStatus {
   return "pendente";
 }
 
-function getInstallments(packageItem: PackageRow): InstallmentRow[] {
+export function getInstallments(packageItem: PackageRow): InstallmentRow[] {
   return [...(packageItem.package_installments ?? [])].sort(
     (a, b) => a.installment_number - b.installment_number,
   );
 }
 
-function getCurrentInstallment(packageItem: PackageRow): InstallmentRow | null {
+export function getCurrentInstallment(packageItem: PackageRow): InstallmentRow | null {
   return (
     getInstallments(packageItem).find(
       (item) => getRemainingInstallment(item) > 0,
@@ -406,14 +382,14 @@ function getCurrentInstallment(packageItem: PackageRow): InstallmentRow | null {
   );
 }
 
-function getRemainingInstallment(installment: InstallmentRow): number {
+export function getRemainingInstallment(installment: InstallmentRow): number {
   return (
     Math.max(cents(installment.amount) - cents(installment.amount_paid), 0) /
     100
   );
 }
 
-function getInstallmentPaymentStatus(
+export function getInstallmentPaymentStatus(
   installment: InstallmentRow,
 ): PaymentStatus {
   const status = statusFromPayment(
@@ -425,26 +401,26 @@ function getInstallmentPaymentStatus(
   return "pendente";
 }
 
-function paymentStatusFromTransaction(
+export function paymentStatusFromTransaction(
   status: TransactionStatus,
 ): PaymentStatus {
   if (status === "paid") return "pago";
   return "pendente";
 }
 
-function badgeVariantForPayment(status: PaymentStatus) {
+export function badgeVariantForPayment(status: PaymentStatus) {
   if (status === "pago") return "success";
   return "warning";
 }
 
-function badgeVariantForTransaction(status: TransactionStatus) {
+export function badgeVariantForTransaction(status: TransactionStatus) {
   if (status === "paid") return "success";
   if (status === "overdue") return "danger";
   if (status === "cancelled") return "neutral";
   return "warning";
 }
 
-function getEffectiveTransactionStatus(
+export function getEffectiveTransactionStatus(
   transaction: TransactionRow,
 ): TransactionStatus {
   if (
@@ -458,7 +434,7 @@ function getEffectiveTransactionStatus(
   return transaction.status;
 }
 
-function getDaysUntil(date: string): number {
+export function getDaysUntil(date: string): number {
   const today = parseDateInput(todayDate());
   const target = parseDateInput(date);
 
@@ -467,7 +443,7 @@ function getDaysUntil(date: string): number {
   );
 }
 
-function getExpenseReminderTone(transaction: TransactionRow): ExpenseReminderTone {
+export function getExpenseReminderTone(transaction: TransactionRow): ExpenseReminderTone {
   const daysUntil = getDaysUntil(transaction.due_date);
 
   if (daysUntil < 0 || transaction.status === "overdue") return "overdue";
@@ -475,7 +451,7 @@ function getExpenseReminderTone(transaction: TransactionRow): ExpenseReminderTon
   return "soon";
 }
 
-function getExpenseReminderLabel(transaction: TransactionRow): string {
+export function getExpenseReminderLabel(transaction: TransactionRow): string {
   const daysUntil = getDaysUntil(transaction.due_date);
 
   if (daysUntil < 0) {
@@ -489,14 +465,14 @@ function getExpenseReminderLabel(transaction: TransactionRow): string {
   return `Vence em ${daysUntil} dias`;
 }
 
-function isStandaloneProcedureIncome(transaction: TransactionRow): boolean {
+export function isStandaloneProcedureIncome(transaction: TransactionRow): boolean {
   return (
     transaction.type === "income" &&
     transaction.category === "Recebimento de procedimentos"
   );
 }
 
-function isInitialPackageReceipt(transaction: TransactionRow): boolean {
+export function isInitialPackageReceipt(transaction: TransactionRow): boolean {
   return (
     transaction.type === "income" &&
     transaction.category === "Recebimento de pacote" &&
@@ -506,7 +482,7 @@ function isInitialPackageReceipt(transaction: TransactionRow): boolean {
   );
 }
 
-function dedupeProcedureTransactions(
+export function dedupeProcedureTransactions(
   transactions: TransactionRow[],
 ): TransactionRow[] {
   const seen = new Set<string>();
@@ -529,15 +505,15 @@ function dedupeProcedureTransactions(
   });
 }
 
-function todayDate(): string {
+export function todayDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-const ZIP_LOCAL_FILE_HEADER = 0x04034b50;
-const ZIP_CENTRAL_DIRECTORY_HEADER = 0x02014b50;
-const ZIP_END_OF_CENTRAL_DIRECTORY = 0x06054b50;
+export const ZIP_LOCAL_FILE_HEADER = 0x04034b50;
+export const ZIP_CENTRAL_DIRECTORY_HEADER = 0x02014b50;
+export const ZIP_END_OF_CENTRAL_DIRECTORY = 0x06054b50;
 
-function crc32(data: Uint8Array): number {
+export function crc32(data: Uint8Array): number {
   let crc = 0xffffffff;
 
   for (const byte of data) {
@@ -550,7 +526,7 @@ function crc32(data: Uint8Array): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-function concatBytes(parts: Uint8Array[]): Uint8Array {
+export function concatBytes(parts: Uint8Array[]): Uint8Array {
   const output = new Uint8Array(parts.reduce((size, part) => size + part.length, 0));
   let offset = 0;
 
@@ -563,7 +539,7 @@ function concatBytes(parts: Uint8Array[]): Uint8Array {
 }
 
 /** Adds Excel's frozen pane metadata while retaining the workbook generated by SheetJS. */
-function freezeFirstFiveColumns(workbookData: Uint8Array): Uint8Array {
+export function freezeFirstFiveColumns(workbookData: Uint8Array): Uint8Array {
   const view = new DataView(
     workbookData.buffer,
     workbookData.byteOffset,
@@ -704,7 +680,7 @@ function freezeFirstFiveColumns(workbookData: Uint8Array): Uint8Array {
   return concatBytes([...localParts, centralDirectory, footer]);
 }
 
-function generateCommissionReportExcel(
+export function generateCommissionReportExcel(
   report: ProfessionalReport[],
   detailRows: CommissionDetailRow[],
   startDate: string,
@@ -1019,11 +995,11 @@ function generateCommissionReportExcel(
   });
 }
 
-function cleanProcedurePaymentDescription(value: string): string {
+export function cleanProcedurePaymentDescription(value: string): string {
   return value.replace(/\s+-\s+saldo em aberto$/i, "");
 }
 
-function normalizeSearchText(value: string | null | undefined): string {
+export function normalizeSearchText(value: string | null | undefined): string {
   return (value ?? "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -1031,7 +1007,7 @@ function normalizeSearchText(value: string | null | undefined): string {
     .trim();
 }
 
-function matchesPatientSearch(
+export function matchesPatientSearch(
   patientName: string | null | undefined,
   searchTerm: string,
 ): boolean {
@@ -1041,13 +1017,13 @@ function matchesPatientSearch(
   return normalizeSearchText(patientName).includes(normalizedSearch);
 }
 
-function getPatientProfessionalName(
+export function getPatientProfessionalName(
   patient: { profiles: { full_name: string } | null } | null,
 ): string {
   return patient?.profiles?.full_name ?? "Sem fisioterapeuta";
 }
 
-function getAppointmentResponsibleProfessional(
+export function getAppointmentResponsibleProfessional(
   appointment: CommissionAppointment,
 ): { id: string; full_name: string } {
   const responsible = appointment.patients?.profiles;
@@ -1065,8 +1041,7 @@ function getAppointmentResponsibleProfessional(
   };
 }
 
-
-export const Financial = () => {
+export function useFinancialController() {
   const { profile } = useAuth();
   const [clinicProfile, setClinicProfile] = useState<ClinicProfile | null>(null);
 
@@ -1135,29 +1110,13 @@ export const Financial = () => {
   const [expenseForm, setExpenseForm] = useState<ExpenseFormState>(() =>
     initialExpenseForm(),
   );
-  const commissionSectionRef = useRef<HTMLDivElement | null>(null);
   const expenseSectionRef = useRef<HTMLDivElement | null>(null);
-  const financialHistorySectionRef = useRef<HTMLDivElement | null>(null);
   const isPhysio = profile?.role === "physio";
   const isAdmin = profile?.role === "admin";
   const hasPatientSearch = Boolean(normalizeSearchText(patientSearchTerm));
 
   const scrollToExpense = () => {
     expenseSectionRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
-  };
-
-  const scrollToFinancialHistory = () => {
-    financialHistorySectionRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
-  };
-
-  const scrollToCommission = () => {
-    commissionSectionRef.current?.scrollIntoView({
       behavior: "smooth",
       block: "start",
     });
@@ -2571,1296 +2530,136 @@ export const Financial = () => {
     receiptWindow.focus();
   };
 
-  return (
-    <div className="space-y-5 sm:space-y-8 animate-in fade-in duration-500">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
-            Financeiro
-          </h1>
-          <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-1">
-            {isPhysio
-              ? "Acompanhe sua produção financeira pelas aulas realizadas e faltas pagas."
-              : "Registre parcelas, acompanhe histórico de pacotes e cobre pelo WhatsApp."}
-          </p>
-        </div>
-        {!isPhysio && (
-          <Button
-            type="button"
-            variant="outline"
-            className="shrink-0 gap-2"
-            onClick={scrollToFinancialHistory}
-          >
-            <ArrowDownCircle size={16} /> Histórico financeiro
-          </Button>
-        )}
-      </header>
 
-      {error && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
-          {error}
-        </div>
-      )}
+  return {
+    profile,
+    clinicProfile,
+    setClinicProfile,
+    packages,
+    setPackages,
+    appointments,
+    setAppointments,
+    transactions,
+    setTransactions,
+    ownerId,
+    setOwnerId,
+    paymentTarget,
+    setPaymentTarget,
+    commissionTarget,
+    setCommissionTarget,
+    paymentAmount,
+    setPaymentAmount,
+    paymentMethod,
+    setPaymentMethod,
+    paymentReceivedDate,
+    setPaymentReceivedDate,
+    paymentNotes,
+    setPaymentNotes,
+    receivableFilter,
+    setReceivableFilter,
+    dueSort,
+    setDueSort,
+    expenseViewFilter,
+    setExpenseViewFilter,
+    patientSearchTerm,
+    setPatientSearchTerm,
+    loading,
+    setLoading,
+    saving,
+    setSaving,
+    supportsTransactionAttachments,
+    setSupportsTransactionAttachments,
+    attachmentTarget,
+    setAttachmentTarget,
+    attachmentInputRef,
+    error,
+    setError,
+    reportStartDate,
+    setReportStartDate,
+    reportEndDate,
+    setReportEndDate,
+    expenseStartDate,
+    setExpenseStartDate,
+    expenseEndDate,
+    setExpenseEndDate,
+    historyStartDate,
+    setHistoryStartDate,
+    historyEndDate,
+    setHistoryEndDate,
+    financialReportOpen,
+    setFinancialReportOpen,
+    financialReportStartDate,
+    setFinancialReportStartDate,
+    financialReportEndDate,
+    setFinancialReportEndDate,
+    financialReportSections,
+    setFinancialReportSections,
+    expenseForm,
+    setExpenseForm,
+    expenseSectionRef,
+    isPhysio,
+    isAdmin,
+    hasPatientSearch,
+    scrollToExpense,
+    resetExpensePeriod,
+    resetHistoryPeriod,
+    getSelectedCommissionPeriod,
+    selectedCommissionPeriod,
+    commissionPeriodLabel,
+    loadCommissionAppointments,
+    downloadCommissionReportExcel,
+    downloadAdminProductionExcel,
+    loadFinancialData,
+    filteredAppointments,
+    filteredPackages,
+    visibleTransactions,
+    filteredVisibleTransactions,
+    filteredHistoryTransactions,
+    expenseTransactions,
+    expenseReminders,
+    filteredExpenseTransactions,
+    expensePeriodTotals,
+    rawCommissionReport,
+    commissionReport,
+    commissionDetailReport,
+    adminProductionAppointments,
+    adminProductionReport,
+    adminProductionDetailReport,
+    totals,
+    receivables,
+    openPaymentModal,
+    openProcedurePaymentModal,
+    handleRegisterPayment,
+    handleRegisterCommissionPayment,
+    handleRegisterExpense,
+    handleOpenAttachmentUploader,
+    handleAttachExpenseDocument,
+    handleMarkExpensePaid,
+    handleDeleteExpense,
+    handleDeleteTransaction,
+    handleDeletePackageInstallment,
+    generateFinancialPdf,
+    printReceipt,
+    printTransactionReceipt,
+  };
+}
 
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-          <Loader2 className="animate-spin mb-4" size={40} />
-          <p>Carregando financeiro...</p>
-        </div>
-      ) : (
-        <>
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 sm:p-4">
-            <div className="relative flex-1">
-              <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                size={18}
-              />
-              <input
-                type="text"
-                placeholder="Buscar paciente..."
-                className="min-h-11 w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none transition-all text-sm"
-                value={patientSearchTerm}
-                onChange={(event) => setPatientSearchTerm(event.target.value)}
-              />
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              {hasPatientSearch && (
-                <Button
-                  variant="ghost"
-                  className="w-full sm:w-auto"
-                  onClick={() => setPatientSearchTerm("")}
-                >
-                  Limpar busca
-                </Button>
-              )}
-              {!isPhysio && (
-                <Button
-                  variant="outline"
-                  className="w-full gap-2 sm:w-auto"
-                  onClick={() => setFinancialReportOpen(true)}
-                >
-                  <FileDown size={16} />
-                  Exportar PDF
-                </Button>
-              )}
-              {!isPhysio && (
-                <Button className="w-full gap-2 sm:w-auto" onClick={scrollToExpense}>
-                  <PlusCircle size={16} />
-                  Lançar despesa
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                className="w-full gap-2 sm:w-auto"
-                onClick={scrollToCommission}
-              >
-                <UserCheck size={16} />
-                Ir para comissões
-              </Button>
-            </div>
-          </div>
+export type FinancialController = ReturnType<typeof useFinancialController>;
 
-          <div>
-            <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
-              Indicadores do mês atual: {formatDate(getDefaultCommissionPeriod().startDate)} a {formatDate(getDefaultCommissionPeriod().endDate)}.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-6">
-            {!isPhysio && (
-              <>
-                <FinancialCard
-                  label="Receita vendida"
-                  value={totals.sold}
-                  icon={TrendingUp}
-                />
-                <FinancialCard
-                  label="Valor recebido"
-                  value={totals.paid}
-                  icon={DollarSign}
-                />
-                <FinancialCard
-                  label="Total em aberto"
-                  value={totals.open}
-                  icon={AlertTriangle}
-                  danger
-                />
-                <FinancialCard
-                  label="Despesas pagas"
-                  value={totals.paidExpenses}
-                  icon={ArrowDownCircle}
-                  danger
-                />
-                <FinancialCard
-                  label="Resultado líquido"
-                  value={totals.net}
-                  icon={DollarSign}
-                  danger={totals.net < 0}
-                />
-              </>
-            )}
-            <FinancialCard
-              label={isPhysio ? "A receber" : "Comissão a pagar"}
-              value={totals.professionalShare}
-              icon={UserCheck}
-            />
-            </div>
-          </div>
+const FinancialContext = createContext<FinancialController | null>(null);
 
-          {!isPhysio && (
-            <Card className="p-0 overflow-hidden">
-              <div className="p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
-                    Recebíveis
-                  </h3>
-                  <p className="text-sm text-slate-500">
-                    Veja parcelas e procedimentos em aberto, pagos ou tudo
-                    junto.
-                  </p>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <label className="flex items-center gap-2 text-sm text-slate-500">
-                    <Filter size={16} />
-                    <select
-                      className="min-h-11 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg outline-none"
-                      value={receivableFilter}
-                      onChange={(event) =>
-                        setReceivableFilter(
-                          event.target.value as ReceivableFilter,
-                        )
-                      }
-                    >
-                      <option value="open">Em aberto</option>
-                      <option value="paid">Pagas</option>
-                      <option value="all">Todas</option>
-                    </select>
-                  </label>
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      setDueSort((current) =>
-                        current === "asc" ? "desc" : "asc",
-                      )
-                    }
-                  >
-                    <ArrowUpDown size={16} />
-                    Vencimento {dueSort === "asc" ? "mais antigo" : "mais novo"}
-                  </Button>
-                </div>
-              </div>
+export function FinancialProvider({ children }: { children: ReactNode }) {
+  const value = useFinancialController();
+  return <FinancialContext.Provider value={value}>{children}</FinancialContext.Provider>;
+}
 
-              <div className="mobile-card-table overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 text-xs font-bold uppercase tracking-wider">
-                      <th className="px-6 py-4">Paciente</th>
-                      <th className="px-6 py-4">Parcela</th>
-                      <th className="px-6 py-4">Vencimento</th>
-                      <th className="px-6 py-4">Valor</th>
-                      <th className="px-6 py-4">Recebido</th>
-                      <th className="px-6 py-4">Saldo</th>
-                      <th className="px-6 py-4">Status</th>
-                      <th className="px-6 py-4">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {receivables.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={8}
-                          className="px-6 py-10 text-center text-sm text-slate-500"
-                        >
-                          Nenhum recebível encontrado para este filtro.
-                        </td>
-                      </tr>
-                    ) : (
-                      receivables.map((row: ReceivableItem) => (
-                        <tr
-                          key={
-                            row.kind === "package"
-                              ? row.installment.id
-                              : row.transaction.id
-                          }
-                        >
-                          <td className="px-6 py-4" data-label="Paciente">
-                            <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                              {row.patientName}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              Fisio: {row.professionalName}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {row.kind === "package"
-                                ? `Pacote de ${row.packageItem.total_lessons} aulas · total ${currencyFormatter.format(money(row.packageItem.total_amount))} · saldo do pacote ${currencyFormatter.format(Math.max(money(row.packageItem.total_amount) - money(row.packageItem.amount_paid), 0))}`
-                                : row.kind === "package_receipt"
-                                  ? "Entrada de pacote"
-                                  : "Procedimentos avulsos"}
-                            </p>
-                          </td>
-                          <td className="px-6 py-4 text-sm font-semibold" data-label="Parcela">
-                            {row.kind === "package"
-                              ? `#${row.installment.installment_number}`
-                              : row.kind === "package_receipt"
-                                ? "Entrada"
-                                : "Procedimento"}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-slate-500" data-label="Vencimento">
-                            {formatDate(
-                              row.kind === "package"
-                                ? row.installment.due_date
-                                : row.transaction.due_date,
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-sm" data-label="Valor">
-                            {currencyFormatter.format(
-                              row.kind === "package"
-                                ? money(row.installment.amount)
-                                : money(row.transaction.amount),
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-emerald-600 font-semibold" data-label="Recebido">
-                            {currencyFormatter.format(
-                              row.kind === "package"
-                                ? money(row.installment.amount_paid)
-                                : row.transaction.status === "paid"
-                                  ? money(row.transaction.amount)
-                                  : 0,
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-sm font-semibold" data-label="Saldo">
-                            {currencyFormatter.format(row.remaining)}
-                          </td>
-                          <td className="px-6 py-4" data-label="Status">
-                            <Badge variant={badgeVariantForPayment(row.status)}>
-                              {paymentLabel[row.status]}
-                            </Badge>
-                          </td>
-                          <td className="px-6 py-4" data-label="Ações">
-                            <div className="flex gap-2">
-                              {row.remaining > 0 && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() =>
-                                    row.kind === "package"
-                                      ? openPaymentModal(
-                                          row.packageItem,
-                                          row.installment,
-                                        )
-                                      : openProcedurePaymentModal(
-                                          row.transaction,
-                                        )
-                                  }
-                                >
-                                  Registrar
-                                </Button>
-                              )}
-                              {row.kind === "package" && (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() =>
-                                      printReceipt(
-                                        row.packageItem,
-                                        row.installment,
-                                      )
-                                    }
-                                  >
-                                    <Receipt size={14} />
-                                  </Button>
-                                  {isAdmin && (
-                                    <Button
-                                      size="sm"
-                                      variant="danger"
-                                      onClick={() =>
-                                        handleDeletePackageInstallment(
-                                          row.packageItem,
-                                          row.installment,
-                                        )
-                                      }
-                                      disabled={saving}
-                                      title="Excluir parcela"
-                                    >
-                                      <Trash2 size={14} />
-                                      Excluir
-                                    </Button>
-                                  )}
-                                </>
-                              )}
-                              {isAdmin && row.kind === "procedure" && (
-                                <Button
-                                  size="sm"
-                                  variant="danger"
-                                  onClick={() => handleDeleteTransaction(row.transaction)}
-                                  disabled={saving}
-                                  title="Excluir recebível"
-                                >
-                                  <Trash2 size={14} />
-                                  Excluir
-                                </Button>
-                              )}
-                              {row.kind === "package_receipt" && (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() =>
-                                      printTransactionReceipt(row.transaction)
-                                    }
-                                    title="Imprimir recibo"
-                                  >
-                                    <Receipt size={14} />
-                                  </Button>
-                                  {isAdmin && (
-                                    <Button
-                                      size="sm"
-                                      variant="danger"
-                                      onClick={() =>
-                                        handleDeleteTransaction(row.transaction)
-                                      }
-                                      disabled={saving}
-                                      title="Excluir entrada"
-                                    >
-                                      <Trash2 size={14} /> Excluir
-                                    </Button>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          )}
+export function useFinancial(): FinancialController {
+  const context = useContext(FinancialContext);
+  if (!context) throw new Error("useFinancial deve ser usado dentro de FinancialProvider");
+  return context;
+}
 
-          {!isPhysio && (
-            <Card className="p-0 overflow-hidden">
-              <div
-                ref={expenseSectionRef}
-                className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
-              >
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                    Despesas da clínica
-                  </h3>
-                  <p className="text-sm text-slate-500">
-                    Registre contas pagas ou vencimentos pendentes para acompanhar o que sai.
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-slate-500">Pagas no período</p>
-                    <p className="font-bold text-rose-600">
-                      {currencyFormatter.format(expensePeriodTotals.paidExpenses)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">Em aberto no período</p>
-                    <p className="font-bold text-amber-600">
-                      {currencyFormatter.format(expensePeriodTotals.openExpenses)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-b border-slate-100 p-4 dark:border-slate-800">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                      Histórico financeiro
-                    </h4>
-                    <p className="text-xs text-slate-500">
-                      Por padrão, mostrando despesas dos últimos 30 dias.
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                    <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-                      De
-                      <input
-                        type="date"
-                        value={expenseStartDate}
-                        onChange={(event) => {
-                          setExpenseStartDate(event.target.value);
-                          setExpenseViewFilter("period");
-                        }}
-                        className="mt-1 min-h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-800 dark:bg-slate-900"
-                      />
-                    </label>
-                    <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-                      Até
-                      <input
-                        type="date"
-                        value={expenseEndDate}
-                        onChange={(event) => {
-                          setExpenseEndDate(event.target.value);
-                          setExpenseViewFilter("period");
-                        }}
-                        className="mt-1 min-h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-800 dark:bg-slate-900"
-                      />
-                    </label>
-                    <div className="flex flex-col gap-2 self-end sm:flex-row">
-                      <Button
-                        type="button"
-                        variant={expenseViewFilter === "payable" ? "secondary" : "outline"}
-                        className="gap-2"
-                        onClick={() => setExpenseViewFilter("payable")}
-                      >
-                        <AlertTriangle size={16} />
-                        A pagar
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={expenseViewFilter === "period" ? "secondary" : "outline"}
-                        onClick={resetExpensePeriod}
-                      >
-                        Últimos 30 dias
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {expenseReminders.length > 0 && (
-                <div className="border-b border-amber-100 bg-amber-50/70 p-4 dark:border-amber-900/40 dark:bg-amber-900/10">
-                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-amber-900 dark:text-amber-300">
-                    <AlertTriangle size={16} />
-                    Despesas para pagar nos próximos {expenseReminderDays} dias
-                  </div>
-                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                    {expenseReminders.slice(0, 6).map((transaction) => {
-                      const tone = getExpenseReminderTone(transaction);
-
-                      return (
-                        <div
-                          key={transaction.id}
-                          className={clsx(
-                            "rounded-lg border bg-white p-3 text-sm dark:bg-slate-950",
-                            tone === "overdue"
-                              ? "border-rose-200 text-rose-800 dark:border-rose-900/50 dark:text-rose-300"
-                              : "border-amber-200 text-amber-900 dark:border-amber-900/50 dark:text-amber-300",
-                          )}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="truncate font-semibold">
-                                {transaction.category}
-                              </p>
-                              <p className="text-xs opacity-80">
-                                {getExpenseReminderLabel(transaction)} -{" "}
-                                {formatDate(transaction.due_date)}
-                              </p>
-                            </div>
-                            <p className="shrink-0 font-bold">
-                              {currencyFormatter.format(money(transaction.amount))}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)] gap-0">
-                <form
-                  onSubmit={handleRegisterExpense}
-                  className="p-6 border-b xl:border-b-0 xl:border-r border-slate-100 dark:border-slate-800 space-y-4"
-                >
-                  <input
-                    type="file"
-                    ref={attachmentInputRef}
-                    className="hidden"
-                    accept=".pdf,image/png,image/jpeg"
-                    onChange={handleAttachExpenseDocument}
-                  />
-                  <div>
-                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                      Valor
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      required
-                      placeholder="Ex.: 1000"
-                      autoComplete="off"
-                      className="mt-2 w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
-                      value={expenseForm.amount}
-                      onChange={(event) =>
-                        setExpenseForm((current) => ({
-                          ...current,
-                          amount: parseCurrencyValue(event.target.value),
-                        }))
-                      }
-                    />
-                    <p className="mt-2 text-sm text-slate-500">
-                      Valor mostrado: {formatBRLValue(expenseForm.amount) || "R$ 0,00"}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                      Categoria
-                    </label>
-                    <select
-                      className="mt-2 w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
-                      value={expenseForm.category}
-                      onChange={(event) =>
-                        setExpenseForm((current) => ({
-                          ...current,
-                          category: event.target.value,
-                        }))
-                      }
-                    >
-                      {expenseCategories.map((category) => (
-                        <option key={category}>{category}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4">
-                    <div>
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                        Data de pagamento ou vencimento
-                      </label>
-                      <input
-                        type="date"
-                        required
-                        className="mt-2 w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
-                        value={expenseForm.dueDate}
-                        onChange={(event) =>
-                          setExpenseForm((current) => ({
-                            ...current,
-                            dueDate: event.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                        Status
-                      </label>
-                      <select
-                        className="mt-2 w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
-                        value={expenseForm.status}
-                        onChange={(event) =>
-                          setExpenseForm((current) => ({
-                            ...current,
-                            status: event.target.value as TransactionStatus,
-                          }))
-                        }
-                      >
-                        <option value="paid">Pago</option>
-                        <option value="pending">Pendente</option>
-                        <option value="overdue">Vencido</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                      Descrição
-                    </label>
-                    <textarea
-                      rows={3}
-                      className="mt-2 w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none resize-none"
-                      value={expenseForm.description}
-                      onChange={(event) =>
-                        setExpenseForm((current) => ({
-                          ...current,
-                          description: event.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  {supportsTransactionAttachments ? (
-                    <div>
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                        Documento
-                      </label>
-                      <input
-                        type="file"
-                        accept=".pdf,image/png,image/jpeg"
-                        className="mt-2 w-full text-sm text-slate-700 dark:text-slate-200"
-                        onChange={(event) =>
-                          setExpenseForm((current) => ({
-                            ...current,
-                            document:
-                              event.target.files?.[0] ?? null,
-                          }))
-                        }
-                      />
-                      {expenseForm.document && (
-                        <p className="mt-2 text-xs text-slate-500">
-                          Arquivo selecionado: {expenseForm.document.name}
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                      O banco de dados ainda não suporta anexos para despesas.
-                    </div>
-                  )}
-                  <Button type="submit" className="w-full gap-2" isLoading={saving}>
-                    <PlusCircle size={16} />
-                    Lançar despesa
-                  </Button>
-                </form>
-
-                <div className="mobile-card-table max-h-[520px] overflow-auto overscroll-contain xl:max-h-[640px]">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 text-xs font-bold uppercase tracking-wider">
-                        <th className="sticky top-0 z-10 bg-slate-50 px-6 py-4 dark:bg-slate-900">Data</th>
-                        <th className="sticky top-0 z-10 bg-slate-50 px-6 py-4 dark:bg-slate-900">Categoria</th>
-                        <th className="sticky top-0 z-10 bg-slate-50 px-6 py-4 dark:bg-slate-900">Status</th>
-                        <th className="sticky top-0 z-10 bg-slate-50 px-6 py-4 dark:bg-slate-900">Descrição</th>
-                        <th className="sticky top-0 z-10 bg-slate-50 px-6 py-4 dark:bg-slate-900">Documento</th>
-                        <th className="sticky top-0 z-10 bg-slate-50 px-6 py-4 dark:bg-slate-900">Valor</th>
-                        <th className="sticky top-0 z-10 bg-slate-50 px-6 py-4 dark:bg-slate-900">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {filteredExpenseTransactions.length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan={7}
-                            className="px-6 py-10 text-center text-sm text-slate-500"
-                          >
-                            {expenseViewFilter === "payable"
-                              ? "Nenhuma despesa em aberto para pagar nos próximos dias."
-                              : "Nenhuma despesa encontrada neste período."}
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredExpenseTransactions.map((transaction) => {
-                          const effectiveStatus =
-                            getEffectiveTransactionStatus(transaction);
-
-                          return (
-                            <tr key={transaction.id}>
-                              <td className="px-6 py-4 text-sm text-slate-500" data-label="Data">
-                                {formatDate(transaction.due_date)}
-                              </td>
-                              <td className="px-6 py-4 text-sm font-semibold" data-label="Categoria">
-                                {transaction.category}
-                              </td>
-                              <td className="px-6 py-4" data-label="Status">
-                                <Badge
-                                  variant={badgeVariantForTransaction(
-                                    effectiveStatus,
-                                  )}
-                                >
-                                  {transactionStatusLabel[effectiveStatus]}
-                                </Badge>
-                              </td>
-                              <td className="px-6 py-4 text-sm text-slate-500" data-label="Descrição">
-                                {transaction.description ?? "-"}
-                              </td>
-                              <td className="px-6 py-4 text-sm text-slate-500" data-label="Documento">
-                                {transaction.attachments?.[0] ? (
-                                  <StorageFileLink
-                                    bucket="transaction-docs"
-                                    value={transaction.attachments[0]}
-                                    className="text-brand-600 hover:underline"
-                                  >
-                                    Ver documento
-                                  </StorageFileLink>
-                                ) : (
-                                  "-"
-                                )}
-                              </td>
-                              <td className="px-6 py-4 text-sm font-bold text-rose-600" data-label="Valor">
-                                -{currencyFormatter.format(money(transaction.amount))}
-                              </td>
-                              <td className="px-6 py-4" data-label="Ações">
-                                <div className="flex flex-wrap gap-2">
-                                  {effectiveStatus !== "paid" &&
-                                    effectiveStatus !== "cancelled" && (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() =>
-                                          handleMarkExpensePaid(transaction)
-                                        }
-                                        disabled={saving}
-                                      >
-                                        <Check size={14} />
-                                        Marcar pago
-                                      </Button>
-                                    )}
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() =>
-                                      handleOpenAttachmentUploader(transaction)
-                                    }
-                                    disabled={saving || !supportsTransactionAttachments}
-                                  >
-                                    {transaction.attachments?.[0]
-                                      ? "Alterar anexo"
-                                      : "Anexar documento"}
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="danger"
-                                    onClick={() =>
-                                      handleDeleteExpense(transaction)
-                                    }
-                                    disabled={saving}
-                                  >
-                                    <Trash2 size={14} />
-                                    Excluir
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          <div ref={commissionSectionRef} className="scroll-mt-6">
-            <Card className="p-0 overflow-hidden">
-            <div className="p-6 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                    Comissão por fisioterapeuta
-                  </h3>
-                  <p className="text-sm text-slate-500">
-                    {commissionPeriodLabel}
-                  </p>
-                  {hasPatientSearch && (
-                    <p className="text-sm text-slate-500">
-                      Produção filtrada pelo paciente "{patientSearchTerm}".
-                    </p>
-                  )}
-                </div>
-                <div className="flex flex-col md:flex-row gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                      Data Inicial
-                    </label>
-                    <input
-                      type="date"
-                      value={reportStartDate}
-                      onChange={(e) => setReportStartDate(e.target.value)}
-                      className="px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg dark:bg-slate-800 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                      Data Final
-                    </label>
-                    <input
-                      type="date"
-                      value={reportEndDate}
-                      onChange={(e) => setReportEndDate(e.target.value)}
-                      className="px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg dark:bg-slate-800 dark:text-white"
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <button
-                      onClick={downloadCommissionReportExcel}
-                      className="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition-colors"
-                    >
-                      Exportar EXCEL
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 text-xs font-bold uppercase tracking-wider">
-                    <th className="px-6 py-4">Fisioterapeuta</th>
-                    <th className="px-6 py-4">Aulas</th>
-                    <th className="px-6 py-4">Faltas pagas</th>
-                    <th className="px-6 py-4">Bruto</th>
-                    <th className="px-6 py-4">Já pago</th>
-                    <th className="px-6 py-4">A pagar</th>
-                    {!isPhysio && <th className="px-6 py-4">Ações</th>}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {commissionReport.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={isPhysio ? 6 : 7}
-                        className="px-6 py-10 text-center text-sm text-slate-500"
-                      >
-                        Nenhuma sessão não cancelada encontrada neste período.
-                      </td>
-                    </tr>
-                  ) : (
-                    commissionReport.map((item) => (
-                      <tr key={item.professionalId}>
-                        <td className="px-6 py-4">
-                          <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                            {item.professionalName}
-                          </p>
-                          <Badge variant="neutral">Produção</Badge>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-slate-500">
-                          {item.heldClasses}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-slate-500">
-                          {item.paidMisses}
-                        </td>
-                        <td className="px-6 py-4 text-sm font-semibold">
-                          {currencyFormatter.format(item.gross)}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-slate-500">
-                          {currencyFormatter.format(item.commissionPaid)}
-                        </td>
-                        <td
-                          className={clsx(
-                            "px-6 py-4 text-sm font-bold",
-                            item.professionalShare > 0
-                              ? "text-emerald-600"
-                              : "text-slate-500",
-                          )}
-                        >
-                          {currencyFormatter.format(item.professionalShare)}
-                        </td>
-                        {!isPhysio && (
-                          <td className="px-6 py-4">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={item.professionalShare <= 0}
-                              onClick={() => setCommissionTarget(item)}
-                            >
-                              <Check size={14} />
-                              Registrar pagamento
-                            </Button>
-                          </td>
-                        )}
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-          </div>
-          {isAdmin && (
-            <Card className="p-0 overflow-hidden">
-              <div className="flex flex-col gap-4 border-b border-slate-100 p-6 dark:border-slate-800 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                    Produção da fisioterapeuta administradora
-                  </h3>
-                  <p className="text-sm text-slate-500">
-                    Planilha exclusiva da ADM, sem comissão a pagar para estas aulas.
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={downloadAdminProductionExcel}
-                >
-                  Exportar planilha ADM
-                </Button>
-              </div>
-            </Card>
-          )}
-          {!isPhysio && (
-            <div ref={financialHistorySectionRef}>
-            <Card className="p-0 overflow-hidden">
-              <div className="p-6 border-b border-slate-100 dark:border-slate-800">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                      Histórico financeiro
-                    </h3>
-                    <p className="text-sm text-slate-500">
-                      Entradas, pendências e comissões pagas ficam registradas aqui.
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                    <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-                      De
-                      <input
-                        type="date"
-                        value={historyStartDate}
-                        onChange={(event) =>
-                          setHistoryStartDate(event.target.value)
-                        }
-                        className="mt-1 min-h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-800 dark:bg-slate-900"
-                      />
-                    </label>
-                    <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-                      Até
-                      <input
-                        type="date"
-                        value={historyEndDate}
-                        onChange={(event) =>
-                          setHistoryEndDate(event.target.value)
-                        }
-                        className="mt-1 min-h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-800 dark:bg-slate-900"
-                      />
-                    </label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="self-end"
-                      onClick={resetHistoryPeriod}
-                    >
-                      Últimos 30 dias
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 text-xs font-bold uppercase tracking-wider">
-                      <th className="px-6 py-4">Data</th>
-                      <th className="px-6 py-4">Tipo</th>
-                      <th className="px-6 py-4">Categoria</th>
-                      <th className="px-6 py-4">Status</th>
-                      <th className="px-6 py-4">Descrição</th>
-                      <th className="px-6 py-4">Documento</th>
-                      <th className="px-6 py-4">Valor</th>
-                      {isAdmin && <th className="px-6 py-4">Ações</th>}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {filteredHistoryTransactions.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={isAdmin ? 8 : 7}
-                          className="px-6 py-10 text-center text-sm text-slate-500"
-                        >
-                          Nenhum lançamento encontrado neste período.
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredHistoryTransactions.map((transaction) => (
-                        <tr key={transaction.id}>
-                          <td className="px-6 py-4 text-sm text-slate-500">
-                            {formatDate(transaction.due_date)}
-                          </td>
-                          <td className="px-6 py-4">
-                            <Badge
-                              variant={
-                                transaction.type === "income"
-                                  ? "success"
-                                  : "warning"
-                              }
-                            >
-                              {transaction.type === "income"
-                                ? "Entrada"
-                                : "Saída"}
-                            </Badge>
-                          </td>
-                          <td className="px-6 py-4 text-sm font-semibold">
-                            {transaction.category}
-                          </td>
-                          <td className="px-6 py-4">
-                            <Badge
-                              variant={badgeVariantForTransaction(
-                                transaction.status,
-                              )}
-                            >
-                              {transactionStatusLabel[transaction.status]}
-                            </Badge>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-slate-500">
-                            {transaction.description ??
-                              transaction.patients?.full_name ??
-                              "-"}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-slate-500" data-label="Documento">
-                            {transaction.attachments?.[0] ? (
-                              <StorageFileLink
-                                bucket="transaction-docs"
-                                value={transaction.attachments[0]}
-                                className="text-brand-600 hover:underline"
-                              >
-                                Ver documento
-                              </StorageFileLink>
-                            ) : (
-                              "-"
-                            )}
-                          </td>
-                          <td
-                            className={clsx(
-                              "px-6 py-4 text-sm font-bold",
-                              transaction.type === "income"
-                                ? "text-emerald-600"
-                                : "text-rose-600",
-                            )}
-                          >
-                            {transaction.type === "income" ? "+" : "-"}
-                            {currencyFormatter.format(
-                              money(transaction.amount),
-                            )}
-                          </td>
-                          {isAdmin && (
-                            <td className="px-6 py-4" data-label="Ações">
-                              <div className="flex gap-2">
-                                {transaction.type === "income" &&
-                                  transaction.status === "paid" && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() =>
-                                        printTransactionReceipt(transaction)
-                                      }
-                                      title="Imprimir recibo"
-                                    >
-                                      <Receipt size={14} />
-                                    </Button>
-                                  )}
-                                <Button
-                                  size="sm"
-                                  variant="danger"
-                                  onClick={() => handleDeleteTransaction(transaction)}
-                                  disabled={saving}
-                                >
-                                  <Trash2 size={14} />
-                                  Excluir
-                                </Button>
-                              </div>
-                            </td>
-                          )}
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-            </div>
-          )}
-        </>
-      )}
-
-      {financialReportOpen &&
-        createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-            <Card className="w-full max-w-lg">
-              <div className="mb-6 flex items-start justify-between">
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                    Exportar relatório financeiro
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Escolha o período e as informações que devem aparecer no PDF.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"
-                  onClick={() => setFinancialReportOpen(false)}
-                  aria-label="Fechar"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              <div className="space-y-5">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Data inicial
-                    <input type="date" value={financialReportStartDate} onChange={(event) => setFinancialReportStartDate(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-800 dark:bg-slate-900" />
-                  </label>
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Data final
-                    <input type="date" value={financialReportEndDate} onChange={(event) => setFinancialReportEndDate(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-800 dark:bg-slate-900" />
-                  </label>
-                </div>
-                <fieldset>
-                  <legend className="text-sm font-medium text-slate-700 dark:text-slate-300">Seções do relatório</legend>
-                  <div className="mt-3 space-y-2">
-                    {([
-                      ["payable", "Contas a pagar", "Despesas pendentes ou vencidas no período."],
-                      ["paid", "Contas pagas", "Despesas já quitadas no período."],
-                      ["receipts", "Recebimentos", "Entradas financeiras recebidas no período."],
-                    ] as const).map(([key, label, description]) => (
-                      <label key={key} className="flex cursor-pointer gap-3 rounded-xl border border-slate-200 p-3 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900">
-                        <input type="checkbox" checked={financialReportSections[key]} onChange={(event) => setFinancialReportSections((current) => ({ ...current, [key]: event.target.checked }))} className="mt-1 h-4 w-4 accent-brand-600" />
-                        <span><span className="block text-sm font-semibold text-slate-800 dark:text-slate-100">{label}</span><span className="text-xs text-slate-500">{description}</span></span>
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-                <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500 dark:bg-slate-900">O relatório abrirá em outra aba. Na janela de impressão, escolha “Salvar como PDF”.</p>
-                <div className="flex gap-3 pt-1">
-                  <Button type="button" variant="outline" className="flex-1" onClick={() => setFinancialReportOpen(false)}>Cancelar</Button>
-                  <Button type="button" className="flex-1 gap-2" onClick={generateFinancialPdf}><FileDown size={16} />Gerar PDF</Button>
-                </div>
-              </div>
-            </Card>
-          </div>,
-          document.body,
-        )}
-
-      {paymentTarget &&
-        createPortal(
-          <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-            <Card className="w-full max-w-md">
-              <div className="flex items-start justify-between mb-6">
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                    Registrar pagamento
-                  </h2>
-                  <p className="text-sm text-slate-500">
-                    {paymentTarget.kind === "package"
-                      ? `${paymentTarget.packageItem.patients?.full_name ?? "Paciente"} · Parcela #${paymentTarget.installment.installment_number}`
-                      : `${paymentTarget.transaction.patients?.full_name ?? "Paciente"} · Procedimentos`}
-                  </p>
-                </div>
-                <button
-                  className="p-2 text-slate-400 hover:bg-slate-100 rounded-lg"
-                  onClick={() => setPaymentTarget(null)}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              <form onSubmit={handleRegisterPayment} className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Valor recebido
-                  </label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    required
-                    placeholder="Ex.: 1000"
-                    autoComplete="off"
-                    className="mt-2 w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
-                    value={paymentAmount}
-                    onChange={(event) =>
-                      setPaymentAmount(parseCurrencyValue(event.target.value))
-                    }
-                  />
-                  <p className="mt-2 text-sm text-slate-500">
-                    Valor mostrado: {formatBRLValue(paymentAmount) || "R$ 0,00"}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Forma de pagamento
-                  </label>
-                  <select
-                    className="mt-2 w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
-                    value={paymentMethod}
-                    onChange={(event) => setPaymentMethod(event.target.value)}
-                  >
-                    <option>Pix</option>
-                    <option>Cartão de crédito</option>
-                    <option>Cartão de débito</option>
-                    <option>Dinheiro</option>
-                    <option>Transferência</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Data do recebimento
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    className="mt-2 w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
-                    value={paymentReceivedDate}
-                    onChange={(event) => setPaymentReceivedDate(event.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Observação <span className="text-slate-400">(opcional)</span>
-                  </label>
-                  <textarea
-                    rows={3}
-                    className="mt-2 w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
-                    value={paymentNotes}
-                    onChange={(event) => setPaymentNotes(event.target.value)}
-                  />
-                </div>
-                <div className="flex gap-3 pt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setPaymentTarget(null)}
-                    disabled={saving}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button type="submit" className="flex-1" isLoading={saving}>
-                    Salvar
-                  </Button>
-                </div>
-              </form>
-            </Card>
-          </div>,
-          document.body,
-        )}
-
-      {commissionTarget &&
-        createPortal(
-          <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-            <Card className="w-full max-w-md">
-              <div className="flex items-start justify-between mb-6">
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                    Registrar comissão
-                  </h2>
-                  <p className="text-sm text-slate-500">
-                    {commissionTarget.professionalName}
-                  </p>
-                </div>
-                <button
-                  className="p-2 text-slate-400 hover:bg-slate-100 rounded-lg"
-                  onClick={() => setCommissionTarget(null)}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 p-4 mb-4">
-                <p className="text-sm text-slate-500">Valor da comissão</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {currencyFormatter.format(commissionTarget.professionalShare)}
-                </p>
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setCommissionTarget(null)}
-                  disabled={saving}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  type="button"
-                  className="flex-1"
-                  isLoading={saving}
-                  onClick={handleRegisterCommissionPayment}
-                >
-                  Confirmar
-                </Button>
-              </div>
-            </Card>
-          </div>,
-          document.body,
-        )}
-    </div>
-  );
-};
-
-function FinancialCard({
+export function FinancialCard({
   label,
   value,
   icon: Icon,
@@ -3898,3 +2697,4 @@ function FinancialCard({
     </Card>
   );
 }
+
