@@ -29,6 +29,7 @@ import {
   ProcedureType,
 } from "./types";
 import { Fisioterapeuta } from "../Agenda/types";
+import { professionalsForSelection, withInactiveLabel } from "../../lib/professionals";
 
 interface NovoPacienteModalProps {
   isOpen: boolean;
@@ -2034,9 +2035,12 @@ export const NovoPacienteModal = ({
                         }
                       >
                         <option value="">Selecione</option>
-                        {fisioterapeutas.map((professional) => (
+                        {professionalsForSelection(
+                          fisioterapeutas,
+                          formData.responsible_professional_id,
+                        ).map((professional) => (
                           <option key={professional.id} value={professional.id}>
-                            {professional.nome}
+                            {withInactiveLabel(professional.nome, professional)}
                           </option>
                         ))}
                       </select>

@@ -20,6 +20,12 @@ import {
   clinicHeaderHtml,
   fetchClinicProfile,
 } from "../lib/clinicProfile";
+import {
+  isActiveProfessional,
+  isMissingActiveColumn,
+  professionalsForSelection,
+  withInactiveLabel,
+} from "../lib/professionals";
 
 type CertificateKind = "comparecimento" | "afastamento";
 
@@ -34,18 +40,23 @@ type ProfessionalOption = {
   full_name: string;
   role: string | null;
   professional_registry?: string | null;
+  active?: boolean | null;
 };
 
 async function loadProfessionals(clinicId: string) {
   const result = await supabase
     .from("profiles")
-    .select("id, full_name, role, professional_registry")
+    .select("id, full_name, role, professional_registry, active")
     .eq("clinic_id", clinicId)
     .in("role", ["admin", "physio"])
     .order("full_name", { ascending: true });
 
-  // Compatível com bancos que ainda não receberam a coluna nova
-  if (result.error?.message.includes("professional_registry")) {
+  // Compatível com bancos que ainda não receberam as colunas novas
+  if (
+    result.error?.message.includes("professional_registry") ||
+    isMissingActiveColumn(result.error)
+  ) {
+    console.warn("Colunas novas de profiles ausentes; carregando profissionais sem elas:", result.error?.message);
     return supabase
       .from("profiles")
       .select("id, full_name, role")
@@ -203,10 +214,11 @@ export const Certificates = () => {
       setProfessionals(loadedProfessionals);
 
       if (!professionalId) {
+        const activeProfessionals = loadedProfessionals.filter(isActiveProfessional);
         const defaultProfessional =
-          loadedProfessionals.find((item) => item.id === profile.id) ??
-          loadedProfessionals.find((item) => item.role === "physio") ??
-          loadedProfessionals[0];
+          activeProfessionals.find((item) => item.id === profile.id) ??
+          activeProfessionals.find((item) => item.role === "physio") ??
+          activeProfessionals[0];
         setProfessionalId(defaultProfessional?.id ?? "");
       }
 
@@ -444,9 +456,9 @@ export const Certificates = () => {
                     onChange={(event) => setProfessionalId(event.target.value)}
                   >
                     <option value="">Selecione</option>
-                    {professionals.map((professional) => (
+                    {professionalsForSelection(professionals, professionalId).map((professional) => (
                       <option key={professional.id} value={professional.id}>
-                        {professional.full_name}
+                        {withInactiveLabel(professional.full_name, professional)}
                       </option>
                     ))}
                   </select>

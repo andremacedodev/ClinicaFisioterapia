@@ -23,6 +23,11 @@ import {
   StatusAgendamento,
 } from "./types";
 import "./agendamento.css";
+import {
+  activeFirst,
+  isActiveProfessional,
+  withInactiveLabel,
+} from "../../lib/professionals";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -218,6 +223,16 @@ export const AgendamentoPage: React.FC = () => {
       ativo = false;
     };
   }, [ano, mes, profile]);
+
+  // Legenda: ativos + inativos que ainda têm atendimento no mês exibido.
+  const fisioterapeutasLegenda = useMemo(() => {
+    const comAtendimentoNoMes = new Set(agendamentos.map((ag) => ag.fisioterapeutaId));
+    return activeFirst(
+      fisioterapeutas.filter(
+        (f) => isActiveProfessional(f) || comAtendimentoNoMes.has(f.id),
+      ),
+    );
+  }, [agendamentos, fisioterapeutas]);
 
   const agendamentosPorData = useMemo(() => {
     const mapa: Record<string, Agendamento[]> = {};
@@ -558,14 +573,14 @@ export const AgendamentoPage: React.FC = () => {
 
           {/* Legenda fisioterapeutas */}
           <div className="legenda">
-            {fisioterapeutas.map((f) => (
+            {fisioterapeutasLegenda.map((f) => (
               <div key={f.id} className="legenda-item">
                 <span
                   className="legenda-dot"
                   style={{ backgroundColor: f.cor }}
                 />
                 <span className="legenda-nome">
-                  {f.nome.replace("Dr", "Dr.")}
+                  {withInactiveLabel(f.nome.replace("Dr", "Dr."), f)}
                 </span>
               </div>
             ))}
@@ -617,9 +632,9 @@ export const AgendamentoPage: React.FC = () => {
                 }
               >
                 <option value="todos">{messages.agenda.filters.allPhysios}</option>
-                {fisioterapeutas.map((f) => (
+                {activeFirst(fisioterapeutas).map((f) => (
                   <option key={f.id} value={f.id}>
-                    {f.nome}
+                    {withInactiveLabel(f.nome, f)}
                   </option>
                 ))}
               </select>

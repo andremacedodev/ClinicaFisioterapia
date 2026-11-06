@@ -7,6 +7,8 @@ interface Profile {
   clinic_id: string;
   full_name: string;
   role: "admin" | "physio" | "receptionist";
+  // Ausente em bancos sem a migration de inativação: tratar como ativo.
+  active?: boolean;
 }
 
 interface AuthContextType {
@@ -118,6 +120,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Se a administradora inativar alguém com o app aberto, a tela de
+  // "acesso desativado" aparece quando a pessoa volta para a aba.
+  // Falha de rede aqui não derruba a sessão: só registra no console.
+  useEffect(() => {
+    const userId = user?.id;
+    if (!userId) return;
+
+    const checkActive = async () => {
+      if (document.visibilityState !== "visible") return;
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("active")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Erro ao verificar se o perfil está ativo:", error);
+        return;
+      }
+
+      const active = (data as { active?: boolean } | null)?.active;
+      if (typeof active !== "boolean") return;
+
+      setProfile((current) =>
+        current && current.active !== active ? { ...current, active } : current,
+      );
+    };
+
+    document.addEventListener("visibilitychange", checkActive);
+    return () => document.removeEventListener("visibilitychange", checkActive);
+  }, [user?.id]);
 
   const signOut = async () => {
     await supabase.auth.signOut();

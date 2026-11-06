@@ -34,6 +34,7 @@ import {
 import { NovoPacienteModal } from "./NovoPacienteModal";
 import RegisterReceiptModal from "../../components/modals/RegisterReceiptModal";
 import { NewPatientForm, Patient, PatientProcedure } from "./types";
+import { activeFirst, withInactiveLabel } from "../../lib/professionals";
 
 const STATUS_LABEL = {
   ativo: "Ativo",
@@ -591,9 +592,9 @@ export const PacientesPage = () => {
               onChange={(event) => setProfessionalFilterId(event.target.value)}
             >
               <option value="">Todos os fisioterapeutas</option>
-              {fisioterapeutas.map((professional) => (
+              {activeFirst(fisioterapeutas).map((professional) => (
                 <option key={professional.id} value={professional.id}>
-                  {professional.nome}
+                  {withInactiveLabel(professional.nome, professional)}
                 </option>
               ))}
             </select>

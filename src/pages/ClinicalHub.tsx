@@ -71,6 +71,7 @@ import {
   getProfiles,
   updateEvolution,
 } from "../services/evolutionService";
+import { professionalsForSelection, withInactiveLabel } from "../lib/professionals";
 
 // ── Tipos de aba ──────────────────────────────────────────────────────────────
 type Tab = "timeline" | "agenda" | "details" | "files" | "assessments";
@@ -840,9 +841,9 @@ export const ClinicalHub = () => {
                         onChange={(e) => setSelectedProfile(e.target.value)}
                       >
                         <option value="">Profissional responsável</option>
-                        {profiles.map((p) => (
+                        {professionalsForSelection(profiles, selectedProfile).map((p) => (
                           <option key={p.id} value={p.id}>
-                            {p.full_name}
+                            {withInactiveLabel(p.full_name, p)}
                           </option>
                         ))}
                       </select>

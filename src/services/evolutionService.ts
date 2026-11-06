@@ -1,5 +1,6 @@
 import { supabase } from "../lib/supabase";
 import { resolveStoragePath } from "../lib/storageFiles";
+import { isMissingActiveColumn } from "../lib/professionals";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -69,6 +70,7 @@ export interface Profile {
   role?: string | null;
   avatar_url?: string | null;
   updated_at?: string;
+  active?: boolean | null;
 }
 
 export interface PatientAppointment {
@@ -349,14 +351,22 @@ export function extrairDocumentos(evolutions: Evolution[]): Documento[] {
 
 // ── Profissionais ─────────────────────────────────────────────────────────────
 
+// Traz ativos e inativos; as telas filtram com lib/professionals.ts.
 export async function getProfiles(): Promise<Profile[]> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, full_name, role, avatar_url")
-    .order("full_name");
+  const query = (columns: string) =>
+    supabase.from("profiles").select(columns).order("full_name");
+
+  let { data, error } = await query("id, full_name, role, avatar_url, active");
+
+  if (isMissingActiveColumn(error)) {
+    console.warn(
+      "Coluna profiles.active ausente: aplique a migration de inativação. Todos os profissionais serão tratados como ativos.",
+    );
+    ({ data, error } = await query("id, full_name, role, avatar_url"));
+  }
 
   if (error) throw new Error(`Erro ao buscar profissionais: ${error.message}`);
-  return (data ?? []) as Profile[];
+  return (data ?? []) as unknown as Profile[];
 }
 
 export async function getAppointmentsByPatient(

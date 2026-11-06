@@ -60,6 +60,8 @@ export interface Fisioterapeuta {
   especialidade: string;
   cor: string; // hex color for calendar identification
   role?: "admin" | "physio" | "receptionist" | null;
+  // false = profissional inativado na tela Equipe (só aparece no histórico)
+  active?: boolean;
 }
 
 export interface Agendamento {
