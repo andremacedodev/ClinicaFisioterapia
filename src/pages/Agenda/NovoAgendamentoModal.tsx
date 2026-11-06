@@ -10,6 +10,11 @@ import {
   SESSION_CAPACITY,
   SESSION_DURATION_MINUTES,
 } from "./Agendamentoservice";
+import {
+  isActiveProfessional,
+  professionalsForSelection,
+  withInactiveLabel,
+} from "../../lib/professionals";
 
 const TIPOS_SESSAO: TipoSessao[] = [
   "RPG",
@@ -422,12 +427,18 @@ export const NovoAgendamentoModal: React.FC<Props> = ({
                 required
               >
                 <option value="">Selecione o fisioterapeuta</option>
-                {fisioterapeutas.map((f) => (
+                {professionalsForSelection(fisioterapeutas, form.fisioterapeutaId).map((f) => (
                   <option key={f.id} value={f.id}>
-                    {f.nome}
+                    {withInactiveLabel(f.nome, f)}
                   </option>
                 ))}
               </select>
+              {selectedProfessional && !isActiveProfessional(selectedProfessional) && (
+                <p className="mt-1 text-xs font-medium text-amber-700">
+                  {selectedProfessional.nome} está inativa. Para aulas novas,
+                  escolha outra profissional.
+                </p>
+              )}
             </div>
 
             {/* Data e Horários */}

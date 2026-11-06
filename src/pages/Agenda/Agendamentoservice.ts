@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import { isMissingActiveColumn } from "../../lib/professionals";
 import {
   Agendamento,
   Fisioterapeuta,
@@ -46,6 +47,7 @@ type ProfessionalDB = {
   id: string;
   full_name: string;
   role: string | null;
+  active?: boolean | null;
 };
 
 type AppointmentStatusDB =
@@ -456,6 +458,7 @@ function toFisioterapeuta(
     especialidade: db.role === "physio" ? "Fisioterapia" : db.role ?? "",
     cor: PROFESSIONAL_COLORS[index % PROFESSIONAL_COLORS.length],
     role: db.role,
+    active: db.active !== false,
   };
 }
 
@@ -510,25 +513,38 @@ function toAgendamento(db: AppointmentDB): Agendamento {
   };
 }
 
+// Traz ativos e inativos: a cor de cada profissional depende da posição na
+// lista, então manter os inativos preserva as cores do histórico. As telas
+// filtram os inativos nas listas de escolha (ver lib/professionals.ts).
 export async function getFisioterapeutas(
   profile?: AccessProfile | null,
 ): Promise<Fisioterapeuta[]> {
-  let query = supabase
-    .from("profiles")
-    .select("id, full_name, role")
-    .order("full_name", { ascending: true });
+  const buildQuery = (columns: string) => {
+    let query = supabase
+      .from("profiles")
+      .select(columns)
+      .order("full_name", { ascending: true });
 
-  if (profile?.clinic_id) {
-    query = query.eq("clinic_id", profile.clinic_id);
+    if (profile?.clinic_id) {
+      query = query.eq("clinic_id", profile.clinic_id);
+    }
+    return query;
+  };
+
+  let { data, error } = await buildQuery("id, full_name, role, active");
+
+  if (isMissingActiveColumn(error)) {
+    console.warn(
+      "Coluna profiles.active ausente: aplique a migration de inativação. Todos os profissionais serão tratados como ativos.",
+    );
+    ({ data, error } = await buildQuery("id, full_name, role"));
   }
-
-  const { data, error } = await query;
 
   if (error) {
     throw new Error(`Erro ao buscar fisioterapeutas: ${error.message}`);
   }
 
-  return ((data ?? []) as ProfessionalDB[]).map(toFisioterapeuta);
+  return ((data ?? []) as unknown as ProfessionalDB[]).map(toFisioterapeuta);
 }
 
 export async function getPacientes(
