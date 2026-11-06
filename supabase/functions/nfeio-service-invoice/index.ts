@@ -326,12 +326,22 @@ async function resolveTenant(request: Request): Promise<Tenant | Response> {
 
   const { data: profile, error: profileError } = await db
     .from("profiles")
-    .select("clinic_id, clinics(nfeio_company_id)")
+    .select("clinic_id, active, clinics(nfeio_company_id)")
     .eq("id", userData.user.id)
     .maybeSingle();
 
-  if (profileError || !profile?.clinic_id) {
+  if (profileError) {
+    return json({ message: `Erro ao carregar o perfil: ${profileError.message}` }, 500);
+  }
+
+  if (!profile?.clinic_id) {
     return json({ message: "Usuario sem clinica vinculada." }, 403);
+  }
+
+  // Profissional inativado: a RLS já esconde a clínica, mas sem esta checagem
+  // a resposta seria "empresa NFe.io não configurada", o que confunde.
+  if ((profile as { active?: boolean }).active === false) {
+    return json({ message: "Seu acesso a esta clinica foi desativado." }, 403);
   }
 
   const clinic = Array.isArray(profile.clinics) ? profile.clinics[0] : profile.clinics;

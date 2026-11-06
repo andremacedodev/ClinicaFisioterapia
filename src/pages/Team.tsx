@@ -1,5 +1,6 @@
-import { FormEvent, useEffect, useState } from "react";
-import { Mail, Plus, UserCheck } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { Mail, Plus, RotateCcw, UserCheck, UserX, X } from "lucide-react";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -11,6 +12,8 @@ type TeamProfile = {
   id: string;
   full_name: string;
   role: string;
+  active: boolean;
+  deactivated_at: string | null;
 };
 
 type Invitation = {
@@ -22,17 +25,73 @@ type Invitation = {
   created_at: string;
 };
 
+type PendingSummary = {
+  future_appointments: number;
+  responsible_patients: number;
+  active_packages: number;
+};
+
+type DeactivationResult = {
+  moved_appointments: number;
+  moved_patients: number;
+  moved_packages: number;
+};
+
+const MISSING_MIGRATION_MESSAGE =
+  "O banco ainda não recebeu a atualização de inativação de profissionais " +
+  "(migration 20261106000000_professional_deactivation.sql). Aplique-a no Supabase.";
+
+// Mensagem do banco quando a coluna/função nova ainda não existe.
+function friendlyError(message: string): string {
+  if (
+    /column .*active.* does not exist/i.test(message) ||
+    (/deactivate_professional|reactivate_professional|professional_pending_summary/i.test(message) &&
+      /(does not exist|could not find|schema cache)/i.test(message))
+  ) {
+    return MISSING_MIGRATION_MESSAGE;
+  }
+  return message;
+}
+
+function roleLabel(role: string): string {
+  if (role === "admin") return messages.team.roles.admin;
+  if (role === "physio") return messages.team.roles.physio;
+  return role;
+}
+
+function plural(count: number, singular: string, pluralForm: string): string {
+  return `${count} ${count === 1 ? singular : pluralForm}`;
+}
+
+function formatDate(value: string | null): string {
+  if (!value) return "";
+  return new Date(value).toLocaleDateString("pt-BR");
+}
+
 export const Team = () => {
   const { profile } = useAuth();
   const [profiles, setProfiles] = useState<TeamProfile[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [reactivatingId, setReactivatingId] = useState<string | null>(null);
+  const [deactivateTarget, setDeactivateTarget] = useState<TeamProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const isAdmin = profile?.role === "admin";
+
+  const activeProfiles = useMemo(
+    () => profiles.filter((item) => item.active),
+    [profiles],
+  );
+  const inactiveProfiles = useMemo(
+    () => profiles.filter((item) => !item.active),
+    [profiles],
+  );
 
   const loadTeam = async () => {
     if (!profile?.clinic_id) {
@@ -43,10 +102,10 @@ export const Team = () => {
     setLoading(true);
     setError(null);
 
-    const [profilesResult, invitationsResult] = await Promise.all([
+    const [profilesResult, invitationsResult, clinicResult] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, full_name, role")
+        .select("id, full_name, role, active, deactivated_at")
         .eq("clinic_id", profile.clinic_id)
         .order("full_name", { ascending: true }),
       supabase
@@ -54,19 +113,27 @@ export const Team = () => {
         .select("id, email, full_name, role, status, created_at")
         .eq("clinic_id", profile.clinic_id)
         .order("created_at", { ascending: false }),
+      supabase
+        .from("clinics")
+        .select("owner_id")
+        .eq("id", profile.clinic_id)
+        .maybeSingle(),
     ]);
 
-    const failed = [profilesResult, invitationsResult].find(
+    const failed = [profilesResult, invitationsResult, clinicResult].find(
       (result) => result.error,
     );
     if (failed?.error) {
-      setError(failed.error.message);
+      setError(friendlyError(failed.error.message));
       setLoading(false);
       return;
     }
 
     setProfiles((profilesResult.data ?? []) as TeamProfile[]);
     setInvitations((invitationsResult.data ?? []) as Invitation[]);
+    setOwnerId(
+      (clinicResult.data as { owner_id?: string | null } | null)?.owner_id ?? null,
+    );
     setLoading(false);
   };
 
@@ -80,6 +147,7 @@ export const Team = () => {
 
     setSaving(true);
     setError(null);
+    setNotice(null);
 
     const { error } = await supabase.from("professional_invitations").insert({
       clinic_id: profile.clinic_id,
@@ -100,6 +168,62 @@ export const Team = () => {
     setSaving(false);
     await loadTeam();
   };
+
+  const handleReactivate = async (item: TeamProfile) => {
+    if (
+      !window.confirm(
+        `Reativar o acesso de ${item.full_name}? Ela volta a entrar no sistema e a aparecer nas listas de profissionais.`,
+      )
+    ) {
+      return;
+    }
+
+    setReactivatingId(item.id);
+    setError(null);
+    setNotice(null);
+
+    const { error } = await supabase.rpc("reactivate_professional", {
+      p_professional_id: item.id,
+    });
+
+    setReactivatingId(null);
+
+    if (error) {
+      setError(`Não foi possível reativar ${item.full_name}: ${friendlyError(error.message)}`);
+      return;
+    }
+
+    setNotice(`${item.full_name} foi reativada.`);
+    await loadTeam();
+  };
+
+  const handleDeactivated = async (
+    item: TeamProfile,
+    result: DeactivationResult,
+    receiverName: string | null,
+  ) => {
+    setDeactivateTarget(null);
+    setError(null);
+
+    const moved = [
+      result.moved_appointments > 0 &&
+        plural(result.moved_appointments, "agendamento", "agendamentos"),
+      result.moved_patients > 0 &&
+        plural(result.moved_patients, "paciente", "pacientes"),
+      result.moved_packages > 0 &&
+        plural(result.moved_packages, "pacote", "pacotes"),
+    ].filter(Boolean);
+
+    setNotice(
+      moved.length > 0 && receiverName
+        ? `${item.full_name} foi inativada. Transferidos para ${receiverName}: ${moved.join(", ")}.`
+        : `${item.full_name} foi inativada.`,
+    );
+    await loadTeam();
+  };
+
+  const canDeactivate = (item: TeamProfile) =>
+    item.id !== profile?.id && item.id !== ownerId;
 
   if (!isAdmin) {
     return (
@@ -129,6 +253,12 @@ export const Team = () => {
       {error && (
         <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
           {error}
+        </div>
+      )}
+
+      {notice && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+          {notice}
         </div>
       )}
 
@@ -171,22 +301,43 @@ export const Team = () => {
         <Card title="Profissionais ativos">
           {loading ? (
             <p className="text-sm text-slate-500">Carregando equipe...</p>
+          ) : activeProfiles.length === 0 ? (
+            <p className="text-sm text-slate-500">Nenhum profissional ativo.</p>
           ) : (
             <div className="space-y-3">
-              {profiles.map((item) => (
+              {activeProfiles.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between rounded-xl border border-slate-100 dark:border-slate-800 p-3"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 dark:border-slate-800 p-3"
                 >
-                  <div>
-                    <p className="font-semibold text-slate-900 dark:text-white">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-900 dark:text-white truncate">
                       {item.full_name}
+                      {item.id === profile?.id && (
+                        <span className="ml-2 text-xs font-normal text-slate-400">(você)</span>
+                      )}
                     </p>
-                    <p className="text-xs text-slate-500">{item.role}</p>
+                    <p className="text-xs text-slate-500">{roleLabel(item.role)}</p>
                   </div>
-                  <Badge variant={item.role === "admin" ? "info" : "success"}>
-                    {item.role === "admin" ? messages.team.roles.admin : messages.team.roles.physio}
-                  </Badge>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Badge variant={item.role === "admin" ? "info" : "success"}>
+                      {roleLabel(item.role)}
+                    </Badge>
+                    {canDeactivate(item) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 text-rose-600 hover:bg-rose-50 dark:text-rose-400"
+                        onClick={() => {
+                          setNotice(null);
+                          setDeactivateTarget(item);
+                        }}
+                      >
+                        <UserX size={14} /> Inativar
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -222,6 +373,262 @@ export const Team = () => {
           </div>
         </Card>
       </div>
+
+      {!loading && inactiveProfiles.length > 0 && (
+        <Card
+          title="Profissionais inativos"
+          subtitle="Sem acesso ao sistema. O histórico de atendimentos, evoluções e comissões continua com o nome delas."
+        >
+          <div className="space-y-3">
+            {inactiveProfiles.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 dark:border-slate-800 p-3"
+              >
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-500 dark:text-slate-400 truncate">
+                    {item.full_name}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {roleLabel(item.role)}
+                    {item.deactivated_at && ` · inativada em ${formatDate(item.deactivated_at)}`}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Badge variant="neutral">Inativa</Badge>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    isLoading={reactivatingId === item.id}
+                    onClick={() => handleReactivate(item)}
+                  >
+                    {reactivatingId !== item.id && <RotateCcw size={14} />} Reativar
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {deactivateTarget && (
+        <DeactivateProfessionalModal
+          professional={deactivateTarget}
+          receivers={activeProfiles.filter(
+            (item) =>
+              item.id !== deactivateTarget.id &&
+              (item.role === "admin" || item.role === "physio"),
+          )}
+          onClose={() => setDeactivateTarget(null)}
+          onDone={handleDeactivated}
+        />
+      )}
     </div>
+  );
+};
+
+type DeactivateModalProps = {
+  professional: TeamProfile;
+  receivers: TeamProfile[];
+  onClose: () => void;
+  onDone: (
+    professional: TeamProfile,
+    result: DeactivationResult,
+    receiverName: string | null,
+  ) => void;
+};
+
+const KEEP_WITH_PROFESSIONAL = "__manter__";
+
+const DeactivateProfessionalModal = ({
+  professional,
+  receivers,
+  onClose,
+  onDone,
+}: DeactivateModalProps) => {
+  const [summary, setSummary] = useState<PendingSummary | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(true);
+  const [receiverId, setReceiverId] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadSummary = async () => {
+      setLoadingSummary(true);
+      setError(null);
+
+      const { data, error } = await supabase.rpc("professional_pending_summary", {
+        p_professional_id: professional.id,
+      });
+
+      if (!active) return;
+
+      if (error) {
+        setError(`Não foi possível verificar as pendências: ${friendlyError(error.message)}`);
+        setLoadingSummary(false);
+        return;
+      }
+
+      const row = (Array.isArray(data) ? data[0] : data) as PendingSummary | null;
+      setSummary(
+        row ?? { future_appointments: 0, responsible_patients: 0, active_packages: 0 },
+      );
+      setLoadingSummary(false);
+    };
+
+    loadSummary();
+    return () => {
+      active = false;
+    };
+  }, [professional.id]);
+
+  const hasPending =
+    !!summary &&
+    summary.future_appointments + summary.responsible_patients + summary.active_packages > 0;
+
+  const mustChooseReceiver = hasPending && !receiverId;
+  const canSubmit = !loadingSummary && !!summary && !mustChooseReceiver && !submitting;
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+
+    setSubmitting(true);
+    setError(null);
+
+    const reassignTo =
+      hasPending && receiverId !== KEEP_WITH_PROFESSIONAL ? receiverId : null;
+
+    const { data, error } = await supabase.rpc("deactivate_professional", {
+      p_professional_id: professional.id,
+      p_reassign_to: reassignTo,
+    });
+
+    if (error) {
+      setError(`Não foi possível inativar: ${friendlyError(error.message)}`);
+      setSubmitting(false);
+      return;
+    }
+
+    const row = (Array.isArray(data) ? data[0] : data) as DeactivationResult | null;
+    const receiverName = reassignTo
+      ? receivers.find((item) => item.id === reassignTo)?.full_name ?? null
+      : null;
+
+    onDone(
+      professional,
+      row ?? { moved_appointments: 0, moved_patients: 0, moved_packages: 0 },
+      receiverName,
+    );
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+    >
+      <Card className="w-full max-w-lg">
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+              Inativar {professional.full_name}
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Ela perde o acesso ao sistema na hora. Atendimentos já realizados,
+              evoluções e comissões continuam no histórico com o nome dela.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            onClick={onClose}
+            disabled={submitting}
+            aria-label="Fechar"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="space-y-5">
+          {error && (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+              {error}
+            </div>
+          )}
+
+          {loadingSummary ? (
+            <p className="text-sm text-slate-500">Verificando pendências...</p>
+          ) : summary && !hasPending ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+              Nenhum agendamento futuro, paciente ou pacote ativo está com ela.
+            </div>
+          ) : summary ? (
+            <>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+                <p className="font-semibold">Ainda estão com ela:</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {summary.future_appointments > 0 && (
+                    <li>{plural(summary.future_appointments, "agendamento futuro", "agendamentos futuros")}</li>
+                  )}
+                  {summary.responsible_patients > 0 && (
+                    <li>{plural(summary.responsible_patients, "paciente sob responsabilidade", "pacientes sob responsabilidade")}</li>
+                  )}
+                  {summary.active_packages > 0 && (
+                    <li>{plural(summary.active_packages, "pacote ativo", "pacotes ativos")}</li>
+                  )}
+                </ul>
+              </div>
+
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Transferir para
+                <select
+                  value={receiverId}
+                  onChange={(event) => setReceiverId(event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <option value="">Escolha uma opção...</option>
+                  {receivers.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.full_name} ({roleLabel(item.role)})
+                    </option>
+                  ))}
+                  <option value={KEEP_WITH_PROFESSIONAL}>
+                    Não transferir (continuam no nome dela)
+                  </option>
+                </select>
+              </label>
+
+              {receiverId === KEEP_WITH_PROFESSIONAL && (
+                <p className="text-xs text-slate-500">
+                  Os itens ficam no nome dela e precisam ser redistribuídos
+                  manualmente pela agenda e pelo cadastro dos pacientes.
+                </p>
+              )}
+            </>
+          ) : null}
+
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              className="gap-2"
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+              isLoading={submitting}
+            >
+              {!submitting && <UserX size={16} />} Inativar acesso
+            </Button>
+          </div>
+        </div>
+      </Card>
+    </div>,
+    document.body,
   );
 };
