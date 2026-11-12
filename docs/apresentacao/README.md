@@ -13,6 +13,9 @@ Coloque as imagens em `prints/` com estes nomes (PNG ou JPG), sem dados reais de
 | `pacientes.png` | Cadastro do paciente / pacote |
 | `prontuario.png` | Prontuário (evolução ou avaliação) |
 | `financeiro.png` | Financeiro (visão geral ou recebimentos) |
+| `whatsapp.png` | WhatsApp (lista de pacientes) |
+| `atestados.png` | Atestados (formulário e prévia) |
+| `equipe.png` | Equipe |
 
 Depois gere de novo:
 
@@ -23,3 +26,5 @@ node build.js
 ```
 
 Espaços sem print aparecem como "Espaço para print". O contato do último slide está entre colchetes para preencher.
+
+Os prints desta pasta já estão com dados fictícios (nomes, telefones, e-mails, CREFITO e valores). Nunca suba prints com dados reais de clientes.

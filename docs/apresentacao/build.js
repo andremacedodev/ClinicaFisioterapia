@@ -61,6 +61,9 @@ const PRINTS = {
   pacientes: "Cadastro do paciente / pacote",
   prontuario: "Prontuário (evolução ou avaliação)",
   financeiro: "Financeiro (visão geral ou recebimentos)",
+  whatsapp: "WhatsApp (lista de pacientes)",
+  atestados: "Atestados (formulário e prévia)",
+  equipe: "Equipe",
 };
 
 function findPrint(key) {
@@ -168,8 +171,16 @@ async function icon(Comp, color) {
   }
 
   // Moldura de tela: print real se existir, senão espaço reservado
-  function screen(slide, key, x, y, w, h, dark = false) {
+  async function screen(slide, key, x, y, w, h, dark = false) {
     const file = findPrint(key);
+    if (file) {
+      const meta = await sharp(file).metadata();
+      const fitH = (w - 0.2) * (meta.height / meta.width) + 0.46;
+      if (fitH < h) {
+        y += (h - fitH) / 2;
+        h = fitH;
+      }
+    }
     slide.addShape(pres.shapes.ROUNDED_RECTANGLE, {
       x, y, w, h, rectRadius: 0.1,
       fill: { color: dark ? C.accent4 : C.background2 },
@@ -232,7 +243,7 @@ async function icon(Comp, color) {
     s.addText("Agenda · Pacientes · Prontuário · Financeiro · Comissões", {
       x: MX, y: 4.7, w: 5.8, h: 0.4, fontSize: 14, italic: true, color: C.accent1, margin: 0, isTextBox: true, objectName: "cover-modules",
     });
-    screen(s, "dashboard", 6.85, 1.3, 5.9, 4.0, true);
+    await screen(s, "dashboard", 6.85, 1.3, 5.9, 4.0, true);
     s.addNotes(
       "Abertura: apresente o FisioOne como um sistema feito especificamente para clínicas de fisioterapia e pilates, não um sistema genérico de consultório. Ele já roda no dia a dia de uma clínica real.",
     );
@@ -327,14 +338,14 @@ async function icon(Comp, color) {
       [Fi.FiFilter, "Cores e filtro por profissional", "Veja o dia da clínica ou só de uma fisioterapeuta."],
     ];
     for (let i = 0; i < rows.length; i++) await iconRow(s, ...rows[i].slice(0, 1), MX, 1.95 + i * 1.15, 5.8, rows[i][1], rows[i][2]);
-    screen(s, "agenda", 6.75, 1.95, 5.98, 4.3);
+    await screen(s, "agenda", 6.75, 1.95, 5.98, 4.3);
     s.addNotes("Mostre a agenda do dia, a lotação de uma turma e como registrar presença ou falta em um clique.");
   }
 
   // ── 5. Pacientes ───────────────────────────────────────────────────────────
   {
     const s = content("Módulos", "Pacientes e pacotes sob controle", "Quem está ativo, quantas aulas restam e o que falta pagar");
-    screen(s, "pacientes", MX, 1.95, 5.98, 4.3);
+    await screen(s, "pacientes", MX, 1.95, 5.98, 4.3);
     const rows = [
       [Fi.FiUser, "Cadastro completo", "Dados, contato de emergência e observações rápidas."],
       [Fi.FiLayers, "Pacotes de aulas", "Quantidade de aulas, valor e parcelas com vencimento."],
@@ -355,14 +366,14 @@ async function icon(Comp, color) {
       [Fi.FiClock, "Histórico completo", "Tudo em ordem cronológica, fácil de consultar."],
     ];
     for (let i = 0; i < rows.length; i++) await iconRow(s, rows[i][0], MX, 1.95 + i * 1.15, 5.8, rows[i][1], rows[i][2]);
-    screen(s, "prontuario", 6.75, 1.95, 5.98, 4.3);
+    await screen(s, "prontuario", 6.75, 1.95, 5.98, 4.3);
     s.addNotes("Mostre uma avaliação de Pilates preenchida e uma evolução recente.");
   }
 
   // ── 7. Financeiro ──────────────────────────────────────────────────────────
   {
     const s = content("Módulos", "Financeiro claro, sem planilha paralela", "Entradas, saídas e o que está em aberto, em uma tela");
-    screen(s, "financeiro", MX, 1.95, 5.98, 4.3);
+    await screen(s, "financeiro", MX, 1.95, 5.98, 4.3);
     const rows = [
       [Fi.FiTrendingUp, "Recebimentos, despesas e extrato", "Resultado do mês sempre atualizado."],
       [Fi.FiAlertCircle, "Inadimplência à vista", "Parcelas vencidas e em aberto destacadas."],
@@ -428,51 +439,30 @@ async function icon(Comp, color) {
   // ── 9. WhatsApp e atestados ────────────────────────────────────────────────
   {
     const s = content("Módulos", "WhatsApp e atestados em um clique", "Mensagens e documentos prontos, sem digitar tudo de novo");
-    const cw = 5.95, x2 = MX + cw + 0.23, y = 1.95, h = 4.6;
-    for (const x of [MX, x2]) {
-      s.addShape(pres.shapes.ROUNDED_RECTANGLE, {
-        x, y, w: cw, h, rectRadius: 0.12, fill: { color: C.background2 }, line: { color: C.accent6, width: 1 }, objectName: oname("half-card"),
+    const cw = 5.95, x2 = MX + cw + 0.23;
+    const cols = [
+      [MX, Fi.FiMessageCircle, C.accent2, "Mensagens prontas no WhatsApp", "whatsapp",
+        "Confirmar aula e Cobrar abrem o WhatsApp com nome, data e valor já preenchidos."],
+      [x2, Fi.FiFileText, C.accent1, "Atestados profissionais", "atestados",
+        "Comparecimento ou afastamento, com CREFITO e assinatura, prontos para imprimir ou salvar em PDF."],
+    ];
+    for (const [x, Ic, bg, title, key, caption] of cols) {
+      await iconTile(s, Ic, x, 1.95, 0.55, bg);
+      s.addText(title, {
+        x: x + 0.75, y: 1.95, w: cw - 0.75, h: 0.55, fontSize: 18, bold: true, color: C.text2, valign: "middle", margin: 0, isTextBox: true, objectName: oname("half-title"),
+      });
+      await screen(s, key, x, 2.7, cw, 3.3);
+      s.addText(caption, {
+        x, y: 6.1, w: cw, h: 0.6, fontSize: 14, color: C.accent5, valign: "top", margin: 0, isTextBox: true, objectName: oname("half-caption"),
       });
     }
-    // WhatsApp
-    await iconTile(s, Fi.FiMessageCircle, MX + 0.35, y + 0.35, 0.6, C.accent2);
-    s.addText("Mensagens prontas no WhatsApp", {
-      x: MX + 1.15, y: y + 0.35, w: cw - 1.4, h: 0.6, fontSize: 18, bold: true, color: C.text2, valign: "middle", margin: 0, isTextBox: true, objectName: "wa-title",
-    });
-    const bubbles = [
-      "Olá, Maria! Confirmando sua aula de Pilates em quinta-feira, 14/11, às 18:00. Responda 1 para confirmar ou 2 para informar ausência.",
-      "Olá, Maria! A parcela 2 do seu pacote de Pilates vence em 20/11 no valor de R$ 180,00. Posso te enviar os dados para pagamento?",
-    ];
-    bubbles.forEach((b, i) => {
-      const by = y + 1.2 + i * 1.5;
-      s.addShape(pres.shapes.ROUNDED_RECTANGLE, {
-        x: MX + 0.35, y: by, w: cw - 0.7, h: 1.3, rectRadius: 0.12, fill: { color: HEX.waBubble }, line: { color: HEX.waBubble }, objectName: oname("wa-bubble"),
-      });
-      s.addText(b, {
-        x: MX + 0.55, y: by + 0.1, w: cw - 1.1, h: 1.1, fontSize: 14, color: C.text1, valign: "middle", margin: 0, isTextBox: true, objectName: oname("wa-text"),
-      });
-    });
-    s.addText("Nome, data e valor já preenchidos pelo sistema", {
-      x: MX + 0.35, y: y + 4.2, w: cw - 0.7, h: 0.3, fontSize: 12, italic: true, color: C.accent5, margin: 0, isTextBox: true, objectName: "wa-caption",
-    });
-    // Atestados
-    await iconTile(s, Fi.FiFileText, x2 + 0.35, y + 0.35, 0.6);
-    s.addText("Atestados profissionais", {
-      x: x2 + 1.15, y: y + 0.35, w: cw - 1.4, h: 0.6, fontSize: 18, bold: true, color: C.text2, valign: "middle", margin: 0, isTextBox: true, objectName: "cert-title",
-    });
-    const certRows = [
-      [Fi.FiCheckSquare, "Comparecimento e afastamento", "Modelos prontos para os casos do dia a dia."],
-      [Fi.FiAward, "Com CREFITO e assinatura", "Dados da profissional e logo da clínica no documento."],
-      [Fi.FiPrinter, "Imprimir ou salvar em PDF", "Entregue na hora ou envie para o paciente."],
-    ];
-    for (let i = 0; i < certRows.length; i++) await iconRow(s, certRows[i][0], x2 + 0.35, y + 1.25 + i * 1.08, cw - 0.6, certRows[i][1], certRows[i][2]);
-    s.addNotes("Mostre o botão Confirmar e o botão Cobrar na tela de WhatsApp, e emita um atestado de comparecimento.");
+    s.addNotes("Mostre o botão Confirmar aula e o botão Cobrar na tela de WhatsApp, e emita um atestado de comparecimento.");
   }
 
   // ── 10. Dashboard ──────────────────────────────────────────────────────────
   {
     const s = content("Módulos", "A clínica inteira em uma tela", "O painel inicial mostra o que importa hoje");
-    screen(s, "dashboard", MX, 1.95, 7.2, 4.6);
+    await screen(s, "dashboard", MX, 1.95, 7.2, 4.6);
     const rows = [
       [Fi.FiCalendar, "Consultas de hoje", "Quem vem e quando."],
       [Fi.FiDollarSign, "Faturamento do mês", "Quanto entrou até agora."],
@@ -487,20 +477,14 @@ async function icon(Comp, color) {
   pres.addSection({ title: "Confiança" });
   {
     const s = content("Confiança", "Equipe organizada e dados protegidos", "Cada pessoa vê só o que precisa ver");
-    const left = [
+    const rows = [
       [Fi.FiUserCheck, "Perfis de acesso", "Administração vê tudo; fisioterapeutas veem a agenda e a própria produção."],
       [Fi.FiMail, "Convite por e-mail", "A profissional cria o acesso dela em poucos minutos."],
-      [Fi.FiUserX, "Saída de profissional sem perder nada", "Inative o acesso e transfira a agenda; o histórico fica guardado."],
+      [Fi.FiUserX, "Saída sem perder nada", "Inative o acesso e transfira a agenda; o histórico fica guardado."],
+      [Fi.FiLock, "Dados protegidos", "Cada clínica vê só os próprios dados; exames abrem com link temporário."],
     ];
-    const right = [
-      [Fi.FiLock, "Dados separados por clínica", "As informações da sua clínica não se misturam com as de ninguém."],
-      [Fi.FiShield, "Arquivos privados", "Exames e documentos abrem só com link temporário."],
-      [Fi.FiSmartphone, "Computador, tablet ou celular", "Pode ser instalado na tela inicial do celular, como um aplicativo."],
-    ];
-    for (let i = 0; i < 3; i++) {
-      await iconRow(s, left[i][0], MX, 1.95 + i * 1.45, 5.8, left[i][1], left[i][2]);
-      await iconRow(s, right[i][0], 6.95, 1.95 + i * 1.45, 5.8, right[i][1], right[i][2]);
-    }
+    for (let i = 0; i < rows.length; i++) await iconRow(s, rows[i][0], MX, 1.95 + i * 1.15, 5.8, rows[i][1], rows[i][2]);
+    await screen(s, "equipe", 6.75, 1.95, 5.98, 4.3);
     s.addNotes("Reforce segurança e privacidade: dados de saúde exigem cuidado, e cada clínica só enxerga os próprios dados.");
   }
 
