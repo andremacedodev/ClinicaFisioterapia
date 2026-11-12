@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { translateAuthError } from "../lib/authErrors";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
-import { Activity, Mail, Lock, ArrowRight } from "lucide-react";
+import { Mail, Lock, ArrowRight } from "lucide-react";
 
 export const Login = () => {
   const [email, setEmail] = useState("");
@@ -23,7 +24,7 @@ export const Login = () => {
     });
 
     if (error) {
-      setError(error.message);
+      setError(translateAuthError(error.message));
       setLoading(false);
     } else {
       navigate("/");
@@ -77,9 +78,13 @@ export const Login = () => {
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Senha
                 </label>
-                <a href="#" className="text-xs text-brand-600 hover:underline">
+                <Link
+                  to="/recuperar-senha"
+                  state={{ email }}
+                  className="text-xs text-brand-600 hover:underline"
+                >
                   Esqueceu a senha?
-                </a>
+                </Link>
               </div>
               <div className="relative">
                 <Lock

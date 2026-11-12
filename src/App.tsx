@@ -19,6 +19,8 @@ import { ClinicalHub } from "./pages/ClinicalHub";
 import { Certificates } from "./pages/Certificates";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
+import { ForgotPassword } from "./pages/ForgotPassword";
+import { ResetPassword } from "./pages/ResetPassword";
 import { SetupClinic } from "./pages/SetupClinic";
 import { InactiveAccess } from "./pages/InactiveAccess";
 import { ClinicSettings } from "./pages/ClinicSettings";
@@ -97,6 +99,8 @@ function App() {
           {/* Public Routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/recuperar-senha" element={<ForgotPassword />} />
+          <Route path="/redefinir-senha" element={<ResetPassword />} />
 
           {/* Protected Routes */}
           <Route

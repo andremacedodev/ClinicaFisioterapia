@@ -1,11 +1,18 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { translateAuthError } from "../lib/authErrors";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Activity, ArrowRight, Building, Lock, Mail, User } from "lucide-react";
 
+type RegisterMode = "clinic" | "invite";
+
 export const Register = () => {
+  const [searchParams] = useSearchParams();
+  const [mode, setMode] = useState<RegisterMode>(
+    searchParams.get("convite") !== null ? "invite" : "clinic",
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -14,19 +21,11 @@ export const Register = () => {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const navigate = useNavigate();
+  const isInvite = mode === "invite";
 
-  const formatAuthError = (message: string) => {
-    const normalized = message.toLowerCase();
-
-    if (
-      normalized.includes("already") ||
-      normalized.includes("registered") ||
-      normalized.includes("exists")
-    ) {
-      return "Este e-mail já possui uma conta. Volte para o login e entre com a senha cadastrada para aceitar o convite.";
-    }
-
-    return message;
+  const fail = (message: string) => {
+    setError(message);
+    setLoading(false);
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -35,64 +34,97 @@ export const Register = () => {
     setError(null);
     setInfo(null);
 
+    const normalizedEmail = email.trim().toLowerCase();
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: {
         data: {
           full_name: fullName,
-        }
+          // Guardado na conta para a tela de configuração inicial, caso o
+          // e-mail precise ser confirmado antes de entrar.
+          ...(isInvite ? {} : { clinic_name: clinicName }),
+        },
       },
     });
 
     if (authError) {
-      setError(formatAuthError(authError.message));
-      setLoading(false);
+      fail(translateAuthError(authError.message));
       return;
     }
 
     if (!authData.session) {
       setInfo(
-        "Conta criada. Confirme seu email e depois faça login para finalizar o vínculo com a clínica.",
+        isInvite
+          ? "Conta criada! Abra o link que enviamos para o seu e-mail para confirmar. Depois entre com seu e-mail e senha e clique em \"Aceitar convite\"."
+          : "Conta criada! Abra o link que enviamos para o seu e-mail para confirmar. Depois entre com seu e-mail e senha para terminar o cadastro da clínica.",
       );
       setLoading(false);
       return;
     }
 
-    if (authData.user) {
-      const { data: clinicData, error: clinicError } = await supabase
-        .from("clinics")
-        .insert({
-          name: clinicName,
-          slug: clinicName.toLowerCase().replace(/\s+/g, "-"),
-          owner_id: authData.user.id,
-        })
-        .select()
-        .single();
-
-      if (clinicError) {
-        setError(clinicError.message);
-        setLoading(false);
-        return;
-      }
-
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .insert({
-          id: authData.user.id,
-          clinic_id: clinicData.id,
-          full_name: fullName,
-          role: "admin",
-        });
-
-      if (profileError) {
-        setError(profileError.message);
-        setLoading(false);
-        return;
-      }
-
-      navigate('/');
+    if (!authData.user) {
+      fail("Não foi possível concluir o cadastro. Tente entrar pelo login.");
+      return;
     }
+
+    // Convite pendente para este e-mail: nunca criar clínica nova. A tela
+    // inicial mostra "Aceitar convite".
+    const { data: invitations, error: invitationError } = await supabase
+      .from("professional_invitations")
+      .select("id")
+      .eq("email", normalizedEmail)
+      .eq("status", "pending")
+      .limit(1);
+
+    if (invitationError) {
+      fail(
+        `Sua conta foi criada, mas não foi possível verificar se existe convite: ${invitationError.message}. Entre pelo login para continuar.`,
+      );
+      return;
+    }
+
+    if (invitations && invitations.length > 0) {
+      navigate("/");
+      return;
+    }
+
+    if (isInvite) {
+      await supabase.auth.signOut();
+      fail(
+        `Sua conta foi criada, mas não encontramos convite para ${normalizedEmail}. Peça para a clínica conferir se o convite foi feito para este e-mail exato e depois entre pelo login.`,
+      );
+      return;
+    }
+
+    const { data: clinicData, error: clinicError } = await supabase
+      .from("clinics")
+      .insert({
+        name: clinicName,
+        slug: clinicName.toLowerCase().replace(/\s+/g, "-"),
+        owner_id: authData.user.id,
+      })
+      .select()
+      .single();
+
+    if (clinicError) {
+      fail(`Erro ao criar a clínica: ${clinicError.message}`);
+      return;
+    }
+
+    const { error: profileError } = await supabase.from("profiles").insert({
+      id: authData.user.id,
+      clinic_id: clinicData.id,
+      full_name: fullName,
+      role: "admin",
+    });
+
+    if (profileError) {
+      fail(`Erro ao criar o seu perfil: ${profileError.message}`);
+      return;
+    }
+
+    navigate("/");
   };
 
   return (
@@ -103,7 +135,11 @@ export const Register = () => {
             <Activity size={32} />
           </div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Crie sua conta</h1>
-          <p className="text-slate-500 dark:text-slate-400">Transforme a gestão da sua clínica hoje.</p>
+          <p className="text-slate-500 dark:text-slate-400">
+            {isInvite
+              ? "Use o mesmo e-mail em que a clínica fez o seu convite."
+              : "Transforme a gestão da sua clínica hoje."}
+          </p>
         </div>
 
         <Card className="p-8">
@@ -120,6 +156,37 @@ export const Register = () => {
               </div>
             )}
 
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Tipo de cadastro">
+              {([
+                ["clinic", "Vou cadastrar minha clínica", "Sou dona ou administradora"],
+                ["invite", "Recebi um convite", "Vou trabalhar numa clínica"],
+              ] as const).map(([value, title, hint]) => {
+                const selected = mode === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    disabled={loading}
+                    onClick={() => {
+                      setMode(value);
+                      setError(null);
+                      setInfo(null);
+                    }}
+                    className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                      selected
+                        ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
+                        : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                    }`}
+                  >
+                    <span className="block text-sm font-semibold">{title}</span>
+                    <span className="block text-xs opacity-80">{hint}</span>
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Seu Nome Completo</label>
               <div className="relative">
@@ -135,6 +202,7 @@ export const Register = () => {
               </div>
             </div>
 
+            {!isInvite && (
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Nome da Clínica / Estúdio</label>
               <div className="relative">
@@ -149,9 +217,12 @@ export const Register = () => {
                 />
               </div>
             </div>
+            )}
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Email Profissional</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                {isInvite ? "E-mail do convite" : "Email Profissional"}
+              </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input 

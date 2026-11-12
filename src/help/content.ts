@@ -177,6 +177,23 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
   },
   {
+    id: "recuperar-senha",
+    category: "primeiros-passos",
+    title: "Esqueci a senha. Como crio uma nova?",
+    summary: "Peça um link pelo e-mail e crie uma senha nova em poucos minutos.",
+    audience: "all",
+    keywords: ["senha", "esqueci", "recuperar", "redefinir", "trocar senha", "não consigo entrar", "login"],
+    steps: [
+      { text: "Na tela de entrada do sistema, clique em **Esqueceu a senha?**, embaixo do campo de senha." },
+      { text: "Digite o e-mail da sua conta e clique em **Enviar link**." },
+      {
+        text: "Abra o seu e-mail e clique no link que enviamos.",
+        tip: "Se não chegar em alguns minutos, olhe a caixa de **spam** ou **lixo eletrônico**. O link vale por pouco tempo: se expirar, peça outro.",
+      },
+      { text: "Digite a **Senha nova** duas vezes (pelo menos 6 caracteres) e clique em **Salvar senha nova**. Pronto: use a senha nova para entrar." },
+    ],
+  },
+  {
     id: "configurar-clinica",
     category: "primeiros-passos",
     title: "Como colocar o logo e os dados da clínica?",
@@ -493,7 +510,8 @@ export const HELP_ARTICLES: HelpArticle[] = [
         text: "Em **Convidar fisioterapeuta**, escreva o nome e o e-mail dela e confira a **Comissão desta fisioterapeuta**. Clique em **Convidar**.",
       },
       {
-        text: "Avise a fisioterapeuta: o sistema **não manda e-mail sozinho**. Ela precisa criar a conta no sistema usando **exatamente o mesmo e-mail** do convite.",
+        text: "Avise a fisioterapeuta: o sistema **não manda e-mail sozinho**. Ela abre o sistema, clica em **Comece agora gratuitamente**, escolhe **Recebi um convite** e cria a conta com **exatamente o mesmo e-mail** do convite.",
+        tip: "Você pode mandar para ela o endereço do sistema terminando em **/register?convite**: a tela já abre na opção **Recebi um convite**.",
       },
       {
         text: "Quando ela entrar, aparece a tela **Aceitar convite**. Depois que ela aceitar, o convite aparece como **Aceito** e ela entra na lista de **Profissionais ativos**.",
@@ -603,7 +621,7 @@ export const HELP_FAQS: HelpFaq[] = [
     id: "esqueci-senha",
     question: "Esqueci a minha senha. O que eu faço?",
     answer:
-      "Fale com o suporte do sistema para redefinir a sua senha. Por segurança, ninguém da clínica consegue ver a sua senha.",
+      "Na tela de login, clique em **Esqueceu a senha?**, digite o seu e-mail e clique em **Enviar link**. Abra o e-mail que chegar e crie uma senha nova. Se o e-mail não aparecer em alguns minutos, olhe a caixa de spam.",
     audience: "all",
     keywords: ["senha", "esqueci", "login", "entrar", "acesso"],
   },
@@ -627,7 +645,7 @@ export const HELP_FAQS: HelpFaq[] = [
     id: "convite-email",
     question: "O sistema manda e-mail para a fisioterapeuta convidada?",
     answer:
-      "Não. Depois de convidar, avise a fisioterapeuta para criar a conta no sistema usando exatamente o mesmo e-mail do convite.",
+      "Não. Depois de convidar, avise a fisioterapeuta para criar a conta escolhendo **Recebi um convite** e usando exatamente o mesmo e-mail do convite.",
     audience: "admin",
     keywords: ["convite", "e-mail", "email", "nova fisioterapeuta"],
   },

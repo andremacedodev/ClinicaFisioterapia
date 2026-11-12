@@ -30,6 +30,7 @@ import {
 } from "./types";
 import { Fisioterapeuta } from "../Agenda/types";
 import { professionalsForSelection, withInactiveLabel } from "../../lib/professionals";
+import { GENDER_OPTIONS, genderFormValue } from "../../lib/patientLabels";
 
 interface NovoPacienteModalProps {
   isOpen: boolean;
@@ -51,7 +52,7 @@ const emptyForm: NewPatientForm = {
   emergency_contact_name: "",
   emergency_contact_phone: "",
   birth_date: "",
-  gender: "other",
+  gender: "",
   quick_note: "",
   status: "ativo",
   address: {
@@ -439,7 +440,7 @@ function formFromPatient(
       emergency_contact_name: patient.emergency_contact_name ?? "",
       emergency_contact_phone: patient.emergency_contact_phone ?? "",
       birth_date: patient.birth_date ?? "",
-      gender: patient.gender ?? "other",
+      gender: genderFormValue(patient.gender),
       quick_note: patient.quick_note ?? "",
       status: "ativo",
       address,
@@ -459,7 +460,7 @@ function formFromPatient(
     emergency_contact_name: patient.emergency_contact_name ?? "",
     emergency_contact_phone: patient.emergency_contact_phone ?? "",
     birth_date: patient.birth_date ?? "",
-    gender: patient.gender ?? "other",
+    gender: genderFormValue(patient.gender),
     quick_note: patient.quick_note ?? "",
     status: patient.status ?? "ativo",
     address,
@@ -1119,6 +1120,32 @@ export const NovoPacienteModal = ({
                           }
                         />
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="patient-gender"
+                        className="text-sm font-medium text-slate-700 dark:text-slate-300"
+                      >
+                        Sexo
+                      </label>
+                      <select
+                        id="patient-gender"
+                        disabled={loading || isRenewing}
+                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                        value={formData.gender}
+                        onChange={(event) =>
+                          updateField("gender", event.target.value)
+                        }
+                      >
+                        {GENDER_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 

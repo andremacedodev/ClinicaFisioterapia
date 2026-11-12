@@ -72,6 +72,7 @@ import {
   updateEvolution,
 } from "../services/evolutionService";
 import { professionalsForSelection, withInactiveLabel } from "../lib/professionals";
+import { genderLabel, PATIENT_STATUS_VARIANT, patientStatusLabel } from "../lib/patientLabels";
 
 // ── Tipos de aba ──────────────────────────────────────────────────────────────
 type Tab = "timeline" | "agenda" | "details" | "files" | "assessments";
@@ -816,8 +817,9 @@ export const ClinicalHub = () => {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="success">Ativo</Badge>
-            {patient.status && <Badge variant="info">{patient.status}</Badge>}
+            <Badge variant={PATIENT_STATUS_VARIANT[patient.status ?? ""] ?? "neutral"}>
+              {patientStatusLabel(patient.status)}
+            </Badge>
           </div>
         </header>
 
@@ -1328,7 +1330,7 @@ export const ClinicalHub = () => {
                       <InfoField
                         icon={User}
                         label="Gênero"
-                        value={patient.gender ?? "—"}
+                        value={genderLabel(patient.gender)}
                       />
                       {patient.procedures && patient.procedures.length > 0 && (
                         <div className="sm:col-span-2 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 p-4">
@@ -1478,7 +1480,7 @@ export const ClinicalHub = () => {
               <div className="space-y-3">
                 <QuickInfo label="Telefone" value={patient.phone ?? "—"} />
                 <QuickInfo label="E-mail" value={patient.email ?? "—"} />
-                <QuickInfo label="Gênero" value={patient.gender ?? "—"} />
+                <QuickInfo label="Gênero" value={genderLabel(patient.gender)} />
                 {patient.birth_date && (
                   <QuickInfo
                     label="Nascimento"
