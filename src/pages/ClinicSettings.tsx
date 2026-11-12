@@ -2,6 +2,7 @@ import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { Check, Copy, ExternalLink, ImagePlus, Trash2 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
+import { DefaultCommissionCard } from "../components/commission/DefaultCommissionCard";
 import { useAuth } from "../context/AuthContext";
 import {
   CLINIC_ASSETS_BUCKET,
@@ -552,6 +553,8 @@ export const ClinicSettings = () => {
                   </div>
                 </div>
               </Card>
+
+              <DefaultCommissionCard clinicId={clinic.id} />
 
               <Card title="Integrações">
                 <div className="space-y-5">

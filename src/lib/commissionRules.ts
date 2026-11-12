@@ -21,7 +21,7 @@ const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "
 
 /** "40%" ou "R$ 25,00 por aula". */
 export function formatCommission(
-  rule: Pick<CommissionRule, "commission_type" | "commission_value"> | null | undefined,
+  rule: { commission_type: string; commission_value: number | string } | null | undefined,
 ): string {
   const applied = rule ?? DEFAULT_COMMISSION_RULE;
   const value = Number(applied.commission_value) || 0;
