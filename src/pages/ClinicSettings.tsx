@@ -9,6 +9,7 @@ import {
   ClinicProfile,
   clinicLogoUrl,
   fetchClinicProfile,
+  notifyClinicProfileUpdated,
   formatCep,
   formatCnpj,
   formatPhone,
@@ -193,7 +194,9 @@ export const ClinicSettings = () => {
     if (!data?.length) {
       throw new Error("Somente a pessoa que criou a clínica pode alterar estes dados.");
     }
-    return fetchClinicProfile(clinic.id);
+    const updated = await fetchClinicProfile(clinic.id);
+    notifyClinicProfileUpdated(updated);
+    return updated;
   };
 
   const saveClinic = async (event: FormEvent<HTMLFormElement>) => {

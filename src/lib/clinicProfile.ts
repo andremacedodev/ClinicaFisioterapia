@@ -61,6 +61,15 @@ export async function fetchClinicProfile(
   throw new Error(error.message);
 }
 
+/** Avisado quando a clínica salva os dados em Configurações (ex.: o menu lateral mostra o nome). */
+export const CLINIC_PROFILE_UPDATED_EVENT = "clinic-profile-updated";
+
+export function notifyClinicProfileUpdated(clinic: ClinicProfile): void {
+  window.dispatchEvent(
+    new CustomEvent<ClinicProfile>(CLINIC_PROFILE_UPDATED_EVENT, { detail: clinic }),
+  );
+}
+
 export function clinicLogoUrl(logoPath: string | null | undefined): string | null {
   if (!logoPath) return null;
   return supabase.storage.from(CLINIC_ASSETS_BUCKET).getPublicUrl(logoPath).data
