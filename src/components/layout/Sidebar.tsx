@@ -19,12 +19,15 @@ import { clsx } from 'clsx';
 import { useAuth } from '../../context/AuthContext';
 import { messages } from '../../i18n';
 import { FisioOneMark, FisioOneWordmark } from '../brand/FisioOneLogo';
+import { useClinicDisplayName } from '../brand/useClinicDisplayName';
 
 export const Sidebar = () => {
   const location = useLocation();
   const { profile, signOut } = useAuth();
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const isAdmin = profile?.role === "admin";
+  // Topo do menu: nome configurado da clínica; sem nome, "FisioOne".
+  const clinicName = useClinicDisplayName(profile?.clinic_id);
   const menuItems = [
     { icon: LayoutDashboard, label: messages.nav.dashboard, path: '/' },
     { icon: Calendar, label: messages.nav.agenda, path: '/agenda' },
@@ -49,7 +52,20 @@ export const Sidebar = () => {
     <aside className="hidden lg:flex w-64 h-screen bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex-col fixed left-0 top-0 z-50">
       <div className="p-6 flex items-center gap-3">
         <FisioOneMark size={40} title={messages.app.brandName} />
-        <FisioOneWordmark className="text-xl" />
+        {clinicName ? (
+          <span
+            className={clsx(
+              "notranslate min-w-0 line-clamp-2 break-words font-bold leading-tight text-slate-900 dark:text-white",
+              clinicName.length > 16 ? "text-base" : "text-xl",
+            )}
+            translate="no"
+            title={clinicName}
+          >
+            {clinicName}
+          </span>
+        ) : (
+          <FisioOneWordmark className="text-xl" />
+        )}
       </div>
 
       <nav className="flex-1 px-4 space-y-1 mt-4">
@@ -96,9 +112,19 @@ export const Sidebar = () => {
         />
         <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-4 shadow-2xl">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <FisioOneMark size={36} title={messages.app.brandName} />
-              <FisioOneWordmark className="text-base" />
+              {clinicName ? (
+                <span
+                  className="notranslate min-w-0 line-clamp-2 break-words text-base font-bold leading-tight text-slate-900 dark:text-white"
+                  translate="no"
+                  title={clinicName}
+                >
+                  {clinicName}
+                </span>
+              ) : (
+                <FisioOneWordmark className="text-base" />
+              )}
             </div>
             <button
               type="button"
