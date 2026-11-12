@@ -1,6 +1,6 @@
 # Apresentação comercial — FisioOne
 
-`FisioOne_Apresentacao.pptx`: apresentação de vendas (13 slides, com roteiro nas anotações do apresentador).
+`FisioOne_Apresentacao.pptx`: apresentação de vendas (15 slides, com roteiro nas anotações do apresentador).
 
 ## Prints das telas
 
@@ -16,6 +16,10 @@ Coloque as imagens em `prints/` com estes nomes (PNG ou JPG), sem dados reais de
 | `whatsapp.png` | WhatsApp (lista de pacientes) |
 | `atestados.png` | Atestados (formulário e prévia) |
 | `equipe.png` | Equipe |
+| `recebimentos.png` | Financeiro: recebimentos |
+| `despesas.png` | Financeiro: despesas |
+| `extrato.png` | Financeiro: extrato |
+| `comissoes.png` | Financeiro: comissões |
 
 Depois gere de novo:
 
