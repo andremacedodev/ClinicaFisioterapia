@@ -22,6 +22,7 @@ import { Register } from "./pages/Register";
 import { SetupClinic } from "./pages/SetupClinic";
 import { InactiveAccess } from "./pages/InactiveAccess";
 import { ClinicSettings } from "./pages/ClinicSettings";
+import { Help } from "./pages/Help";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
 const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
@@ -177,6 +178,18 @@ function App() {
               </ProtectedLayout>
             }
           />
+
+          {["/ajuda", "/ajuda/:articleId"].map((path) => (
+            <Route
+              key={path}
+              path={path}
+              element={
+                <ProtectedLayout>
+                  <Help />
+                </ProtectedLayout>
+              }
+            />
+          ))}
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
