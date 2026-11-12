@@ -14,6 +14,7 @@ import { useAuth } from "../../context/AuthContext";
 import { ChangeEvent, FormEvent, ReactNode, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { CLINIC_HEADER_CSS, ClinicProfile, clinicHeaderHtml, fetchClinicProfile } from "../../lib/clinicProfile";
 import { buildCommissionDetailReport, buildCommissionReport } from "../../lib/commission";
+import { loadCommissionRules, type CommissionRule } from "../../lib/commissionRules";
 import { TrendingUp } from "lucide-react";
 import { Card } from "../../components/ui/Card";
 import { clsx } from "clsx";
@@ -681,6 +682,7 @@ export function useFinancialController() {
     useState<ProfessionalReport | null>(null);
   const [commissionPayments, setCommissionPayments] = useState<CommissionPayment[]>([]);
   const [supportsCommissionPayments, setSupportsCommissionPayments] = useState(false);
+  const [commissionRules, setCommissionRules] = useState<CommissionRule[]>([]);
   const [commissionPaymentAmount, setCommissionPaymentAmount] = useState("");
   const [commissionPaidAt, setCommissionPaidAt] = useState(todayDate);
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -1082,6 +1084,12 @@ export function useFinancialController() {
     if (commissionPaymentsResult.error) setError(commissionPaymentsResult.error);
     setSupportsCommissionPayments(commissionPaymentsResult.supported);
     setCommissionPayments(commissionPaymentsResult.payments);
+
+    const commissionRulesResult = await loadCommissionRules(profile.clinic_id);
+    if (commissionRulesResult.error) {
+      setError(`Erro ao carregar as regras de comissão: ${commissionRulesResult.error}`);
+    }
+    setCommissionRules(commissionRulesResult.rules);
     setLoading(false);
   };
 
@@ -1240,8 +1248,9 @@ export function useFinancialController() {
         ownerId,
         selectedCommissionPeriod.startDate,
         selectedCommissionPeriod.endDate,
+        commissionRules,
       ),
-    [filteredAppointments, ownerId, selectedCommissionPeriod],
+    [commissionRules, filteredAppointments, ownerId, selectedCommissionPeriod],
   );
 
   const commissionReport = useMemo(
@@ -1300,8 +1309,9 @@ export function useFinancialController() {
       ownerId,
       selectedCommissionPeriod.startDate,
       selectedCommissionPeriod.endDate,
+      commissionRules,
     );
-  }, [filteredAppointments, ownerId, selectedCommissionPeriod]);
+  }, [commissionRules, filteredAppointments, ownerId, selectedCommissionPeriod]);
 
   const adminProductionAppointments = useMemo(
     () =>
@@ -1322,12 +1332,13 @@ export function useFinancialController() {
         null,
         selectedCommissionPeriod.startDate,
         selectedCommissionPeriod.endDate,
+        commissionRules,
       ).map((item) => ({
         ...item,
         commissionPaid: 0,
         professionalShare: 0,
       })),
-    [adminProductionAppointments, selectedCommissionPeriod],
+    [adminProductionAppointments, commissionRules, selectedCommissionPeriod],
   );
 
   const adminProductionDetailReport = useMemo(
@@ -1337,12 +1348,13 @@ export function useFinancialController() {
         null,
         selectedCommissionPeriod.startDate,
         selectedCommissionPeriod.endDate,
+        commissionRules,
       ).map((item) => ({
         ...item,
         commissionClassValue: 0,
         totalCommission: 0,
       })),
-    [adminProductionAppointments, selectedCommissionPeriod],
+    [adminProductionAppointments, commissionRules, selectedCommissionPeriod],
   );
 
   const totals = useMemo(() => {

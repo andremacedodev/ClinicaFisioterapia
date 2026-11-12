@@ -36,6 +36,8 @@ export interface Paciente {
   telefone: string;
   email: string;
   dataNascimento: string;
+  // Fisioterapeuta responsável: é quem recebe a comissão das aulas do paciente.
+  responsavelId?: string | null;
   convenio?: string;
   procedimentos?: PatientProcedure[];
   pacoteAtivo?: {

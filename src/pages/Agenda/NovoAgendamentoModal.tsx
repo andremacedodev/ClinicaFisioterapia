@@ -15,6 +15,12 @@ import {
   professionalsForSelection,
   withInactiveLabel,
 } from "../../lib/professionals";
+import {
+  currentCommissionRule,
+  formatCommission,
+  suggestedCommission,
+  type CommissionRule,
+} from "../../lib/commissionRules";
 
 const TIPOS_SESSAO: TipoSessao[] = [
   "RPG",
@@ -40,6 +46,7 @@ interface Props {
   agendamento?: Agendamento | null;
   pacientes: Paciente[];
   fisioterapeutas: Fisioterapeuta[];
+  commissionRules?: CommissionRule[];
   dataInicial?: string;
   pacienteInicialId?: string;
   salvando?: boolean;
@@ -101,9 +108,36 @@ function roundCurrency(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
+// Comissão sugerida pela regra da fisioterapeuta que recebe a comissão
+// (a responsável pelo paciente) na data da aula. O valor sugerido fica
+// gravado na aula ao salvar.
+function commissionProfessionalId(
+  form: Pick<NovoAgendamentoForm, "fisioterapeutaId">,
+  patient: Paciente | undefined,
+): string | null {
+  return patient?.responsavelId || form.fisioterapeutaId || null;
+}
+
+function commissionDate(form: Pick<NovoAgendamentoForm, "data" | "horaInicio">): Date {
+  return form.data ? new Date(`${form.data}T${form.horaInicio || "00:00"}:00`) : new Date();
+}
+
+function suggestCommission(
+  rules: CommissionRule[],
+  form: Pick<NovoAgendamentoForm, "fisioterapeutaId" | "data" | "horaInicio">,
+  patient: Paciente | undefined,
+  classValue: number | undefined,
+): number | undefined {
+  const professionalId = commissionProfessionalId(form, patient);
+  const rule = currentCommissionRule(rules, professionalId, commissionDate(form));
+  if (rule?.commission_type !== "fixed" && !classValue) return undefined;
+  return roundCurrency(suggestedCommission(rules, professionalId, classValue, commissionDate(form))) || undefined;
+}
+
 function applyPatientPackage(
   current: NovoAgendamentoForm,
   patient: Paciente | undefined,
+  rules: CommissionRule[],
 ): NovoAgendamentoForm {
   if (!patient?.pacoteAtivo) {
     const procedures = formatProcedures(patient);
@@ -120,9 +154,12 @@ function applyPatientPackage(
       sessaoNumero: 1,
       totalSessoes: totalProcedureCredits,
       valorAula: Number(primaryProcedure?.agreed_value) || undefined,
-      valorComissao: Number(primaryProcedure?.agreed_value)
-        ? roundCurrency(Number(primaryProcedure.agreed_value) * 0.4)
-        : undefined,
+      valorComissao: suggestCommission(
+        rules,
+        current,
+        patient,
+        Number(primaryProcedure?.agreed_value) || undefined,
+      ),
       observacoes:
         current.observacoes ||
         (primaryProcedure
@@ -149,9 +186,12 @@ function applyPatientPackage(
     totalSessoes: pacote.totalAulas,
     pacoteId: pacote.id,
     valorAula: pacote.valorAula,
-    valorComissao: pacote.valorAula
-      ? roundCurrency(pacote.valorAula * 0.4)
-      : undefined,
+    valorComissao: suggestCommission(
+      rules,
+      { ...current, fisioterapeutaId: pacote.professionalId ?? current.fisioterapeutaId, horaInicio },
+      patient,
+      pacote.valorAula || undefined,
+    ),
     observacoes: current.observacoes || `Pacote ativo: sessão ${getNextSessionNumber(patient)}/${pacote.totalAulas}.`,
   };
 }
@@ -161,6 +201,7 @@ export const NovoAgendamentoModal: React.FC<Props> = ({
   agendamento,
   pacientes,
   fisioterapeutas,
+  commissionRules = [],
   dataInicial,
   pacienteInicialId,
   salvando = false,
@@ -173,6 +214,9 @@ export const NovoAgendamentoModal: React.FC<Props> = ({
     (professional) => professional.id === form.fisioterapeutaId,
   );
   const isCommissionedPhysio = selectedProfessional?.role === "physio";
+  const commissionReceiver = fisioterapeutas.find(
+    (professional) => professional.id === commissionProfessionalId(form, selectedPatient),
+  );
   const tipoOptions = selectedPatient?.pacoteAtivo
     ? ["Pilates"]
     : (selectedPatient?.procedimentos ?? [])
@@ -208,9 +252,12 @@ export const NovoAgendamentoModal: React.FC<Props> = ({
         valorComissao:
           agendamento.valorComissao !== undefined
             ? roundCurrency(agendamento.valorComissao)
-            : agendamento.valorAula
-              ? roundCurrency(agendamento.valorAula * 0.4)
-              : undefined,
+            : suggestCommission(
+                commissionRules,
+                agendamento,
+                pacientes.find((patient) => patient.id === agendamento.pacienteId),
+                agendamento.valorAula,
+              ),
         manualCorrection: agendamento.manualCorrection ?? false,
       });
     } else {
@@ -223,10 +270,11 @@ export const NovoAgendamentoModal: React.FC<Props> = ({
             pacienteId: pacienteInicialId ?? "",
           },
           initialPatient,
+          commissionRules,
         ),
       );
     }
-  }, [agendamento, dataInicial, pacienteInicialId, pacientes, aberto]);
+  }, [agendamento, dataInicial, pacienteInicialId, pacientes, aberto, commissionRules]);
 
   const campo = <K extends keyof NovoAgendamentoForm>(
     key: K,
@@ -261,6 +309,7 @@ export const NovoAgendamentoModal: React.FC<Props> = ({
           observacoes: "",
         },
         patient,
+        commissionRules,
       ),
     );
   };
@@ -277,7 +326,12 @@ export const NovoAgendamentoModal: React.FC<Props> = ({
         ? Number(procedure.agreed_value) || undefined
         : current.valorAula,
       valorComissao: procedure
-        ? roundCurrency(Number(procedure.agreed_value) * 0.4) || undefined
+        ? suggestCommission(
+            commissionRules,
+            current,
+            selectedPatient,
+            Number(procedure.agreed_value) || undefined,
+          )
         : current.valorComissao,
       totalSessoes: procedure
         ? Number(procedure.quantity) || 1
@@ -378,6 +432,7 @@ export const NovoAgendamentoModal: React.FC<Props> = ({
                         return applyPatientPackage(
                           { ...current, manualCorrection: false },
                           selectedPatient,
+                          commissionRules,
                         );
                       }
 
@@ -392,7 +447,12 @@ export const NovoAgendamentoModal: React.FC<Props> = ({
                         valorAula: classValue,
                         valorComissao:
                           current.valorComissao ??
-                          (classValue ? classValue * 0.4 : undefined),
+                          suggestCommission(
+                            commissionRules,
+                            current,
+                            selectedPatient,
+                            classValue,
+                          ),
                         observacoes:
                           current.observacoes ||
                           "Atendimento avulso para correção de aula não registrada.",
@@ -561,7 +621,19 @@ export const NovoAgendamentoModal: React.FC<Props> = ({
                   }
                 />
                 <span className="form-help">
-                  Comissão desta aula específica. Sugestão padrão: 40% do valor bruto.
+                  Comissão desta aula específica. Sugestão pela regra
+                  {commissionReceiver ? ` de ${commissionReceiver.nome}` : ""}:{" "}
+                  {formatCommission(
+                    currentCommissionRule(
+                      commissionRules,
+                      commissionProfessionalId(form, selectedPatient),
+                      commissionDate(form),
+                    ),
+                  )}
+                  {commissionReceiver && commissionReceiver.id !== form.fisioterapeutaId
+                    ? " (a comissão vai para a fisioterapeuta responsável pelo paciente)"
+                    : ""}
+                  .
                 </span>
               </div>
             )}
