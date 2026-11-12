@@ -16,6 +16,11 @@ let applyTheme = async () => {
 if (process.env.APPLY_THEME_JS) ({ applyTheme } = require(process.env.APPLY_THEME_JS));
 
 const OUT = path.join(__dirname, "FisioOne_Apresentacao.pptx");
+// Logo FisioOne (opção "Pulso One"), gerado a partir de brand/mark-*.svg
+const MARK = {
+  light: "image/png;base64," + fs.readFileSync(path.join(__dirname, "brand/mark-light.png")).toString("base64"),
+  dark: "image/png;base64," + fs.readFileSync(path.join(__dirname, "brand/mark-dark.png")).toString("base64"),
+};
 const PRINT_DIR = path.join(__dirname, "prints");
 
 // Mesmas cores do sistema (tailwind brand) + verde-água de apoio
@@ -137,10 +142,11 @@ async function icon(Comp, color) {
           text: "",
         },
       },
+      { image: { x: MX, y: 6.97, w: 0.26, h: 0.26, data: MARK.light, altText: "Logo FisioOne" } },
       {
         text: {
           text: "FisioOne",
-          options: { x: MX, y: 6.95, w: 3, h: 0.3, fontSize: 10, bold: true, color: C.accent1, margin: 0 },
+          options: { x: MX + 0.34, y: 6.95, w: 3, h: 0.3, fontSize: 10, bold: true, color: C.text2, margin: 0 },
         },
       },
     ],
@@ -237,10 +243,14 @@ async function icon(Comp, color) {
   pres.addSection({ title: "Abertura" });
   {
     const s = pres.addSlide({ masterName: "FISIO_DARK", sectionTitle: "Abertura" });
-    await iconTile(s, Fi.FiActivity, MX, 1.35, 0.7, C.accent1);
-    s.addText("FisioOne", {
-      x: MX, y: 2.2, w: 6, h: 1.1, fontSize: 60, bold: true, color: C.background1, margin: 0, isTextBox: true, objectName: "cover-title",
-    });
+    s.addImage({ data: MARK.dark, x: MX, y: 1.25, w: 0.85, h: 0.85, altText: "Logo FisioOne", objectName: "cover-logo" });
+    s.addText(
+      [
+        { text: "Fisio", options: { color: C.background1 } },
+        { text: "One", options: { color: "7DD3FC" } },
+      ],
+      { x: MX, y: 2.2, w: 6, h: 1.1, fontSize: 60, bold: true, margin: 0, isTextBox: true, objectName: "cover-title" },
+    );
     s.addText("A gestão completa da sua clínica de fisioterapia e pilates", {
       x: MX, y: 3.35, w: 5.6, h: 1.0, fontSize: 22, color: C.accent6, margin: 0, valign: "top", isTextBox: true, objectName: "cover-subtitle",
     });
@@ -543,7 +553,7 @@ async function icon(Comp, color) {
   pres.addSection({ title: "Fechamento" });
   {
     const s = pres.addSlide({ masterName: "FISIO_DARK", sectionTitle: "Fechamento" });
-    await iconTile(s, Fi.FiActivity, MX, 1.2, 0.7, C.accent1);
+    s.addImage({ data: MARK.dark, x: MX, y: 1.15, w: 0.75, h: 0.75, altText: "Logo FisioOne", objectName: "closing-logo" });
     s.addText("Vamos ver o FisioOne funcionando na sua clínica?", {
       x: MX, y: 2.05, w: 6.6, h: 1.8, fontSize: 40, bold: true, color: C.background1, valign: "top", margin: 0, isTextBox: true, objectName: "closing-title",
     });
