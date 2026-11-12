@@ -59,11 +59,15 @@ const PRINTS = {
   dashboard: "Dashboard (tela inicial)",
   agenda: "Agenda do dia",
   pacientes: "Cadastro do paciente / pacote",
-  prontuario: "Prontuário (evolução ou avaliação)",
+  prontuario: "Prontuário do paciente",
   financeiro: "Financeiro (visão geral ou recebimentos)",
   whatsapp: "WhatsApp (lista de pacientes)",
   atestados: "Atestados (formulário e prévia)",
   equipe: "Equipe",
+  recebimentos: "Financeiro: recebimentos",
+  despesas: "Financeiro: despesas",
+  extrato: "Financeiro: extrato",
+  comissoes: "Financeiro: comissões",
 };
 
 function findPrint(key) {
@@ -91,7 +95,7 @@ async function icon(Comp, color) {
   const pres = new pptxgen();
   pres.layout = "LAYOUT_WIDE"; // 13.333 x 7.5
   pres.title = "FisioOne — Gestão para clínicas de fisioterapia e pilates";
-  pres.author = "André Macedo";
+  pres.author = "André Macedo Taques";
   pres.company = "FisioOne";
   pres.theme = { headFontFace: THEME.headFontFace, bodyFontFace: THEME.bodyFontFace };
   const C = pres.SchemeColor;
@@ -297,7 +301,7 @@ async function icon(Comp, color) {
       [Fi.FiUsers, "Pacientes", "Cadastro, pacotes e parcelas"],
       [Fi.FiClipboard, "Prontuário", "Evoluções e avaliações de Pilates"],
       [Fi.FiDollarSign, "Financeiro", "Recebimentos, despesas e extrato"],
-      [Fi.FiPercent, "Comissões", "Cálculo automático por atendimento"],
+      [Fi.FiPercent, "Comissões", "Porcentagem ou valor fixo, automático"],
       [Fi.FiMessageCircle, "WhatsApp", "Confirmação de aula e cobrança"],
       [Fi.FiFileText, "Atestados", "Prontos para imprimir ou salvar em PDF"],
       [Fi.FiUserCheck, "Equipe", "Acesso por perfil para cada profissional"],
@@ -360,19 +364,19 @@ async function icon(Comp, color) {
   {
     const s = content("Módulos", "Prontuário eletrônico", "O histórico clínico de cada paciente, organizado e seguro");
     const rows = [
-      [Fi.FiEdit3, "Evoluções por atendimento", "Registro de cada sessão com o nome da profissional."],
-      [Fi.FiActivity, "Avaliação fisioterapêutica de Pilates", "Postural, testes funcionais, flexibilidade e força."],
+      [Fi.FiMic, "Evoluções com ditado por voz", "Fale e o texto aparece; use protocolos clínicos prontos."],
+      [Fi.FiActivity, "Avaliação fisioterapêutica de Pilates", "Postural, mobilidade, testes funcionais, flexibilidade e força."],
+      [Fi.FiClock, "Linha do tempo e histórico de aulas", "Presenças, faltas e a ficha clínica do paciente."],
       [Fi.FiPaperclip, "Exames e documentos anexados", "Arquivos privados, abertos só por quem tem acesso."],
-      [Fi.FiClock, "Histórico completo", "Tudo em ordem cronológica, fácil de consultar."],
     ];
     for (let i = 0; i < rows.length; i++) await iconRow(s, rows[i][0], MX, 1.95 + i * 1.15, 5.8, rows[i][1], rows[i][2]);
     await screen(s, "prontuario", 6.75, 1.95, 5.98, 4.3);
-    s.addNotes("Mostre uma avaliação de Pilates preenchida e uma evolução recente.");
+    s.addNotes("Mostre o ditado por voz numa evolução, os protocolos prontos e as abas de avaliação, histórico de aulas e documentos.");
   }
 
   // ── 7. Financeiro ──────────────────────────────────────────────────────────
   {
-    const s = content("Módulos", "Financeiro claro, sem planilha paralela", "Entradas, saídas e o que está em aberto, em uma tela");
+    const s = content("Módulos", "Financeiro claro em uma tela", "Os números do mês assim que você abre o financeiro");
     await screen(s, "financeiro", MX, 1.95, 5.98, 4.3);
     const rows = [
       [Fi.FiTrendingUp, "Recebimentos, despesas e extrato", "Resultado do mês sempre atualizado."],
@@ -384,55 +388,56 @@ async function icon(Comp, color) {
     s.addNotes("Mostre a visão geral do mês e a lista de parcelas em aberto.");
   }
 
+  // ── 7b. Recebimentos ───────────────────────────────────────────────────────
+  {
+    const s = content("Módulos", "Recebimentos: cada parcela no lugar", "Quem pagou, quem deve e quanto falta de cada pacote");
+    const rows = [
+      [Fi.FiList, "Parcelas de cada pacote", "Vencimento, valor, recebido e saldo, paciente por paciente."],
+      [Fi.FiFilter, "Em aberto, pagos ou tudo", "Ordene pelo vencimento mais antigo e cobre primeiro."],
+      [Fi.FiCheckCircle, "Registrar e emitir recibo", "Pix, cartão ou dinheiro, com recibo em um clique."],
+      [Fi.FiMessageCircle, "Cobrança pelo WhatsApp", "Mensagem de cobrança pronta, com valor e vencimento."],
+    ];
+    for (let i = 0; i < rows.length; i++) await iconRow(s, rows[i][0], MX, 1.95 + i * 1.15, 5.8, rows[i][1], rows[i][2]);
+    await screen(s, "recebimentos", 6.75, 1.95, 5.98, 4.3);
+    s.addNotes("Filtre as parcelas em aberto, registre um recebimento e mostre o recibo.");
+  }
+
+  // ── 7c. Despesas e extrato ─────────────────────────────────────────────────
+  {
+    const s = content("Módulos", "Despesas e extrato sem planilha paralela", "Contas a pagar e o histórico de tudo que entrou e saiu");
+    const cw = 5.95, x2 = MX + cw + 0.23;
+    const cols = [
+      [MX, Fi.FiCreditCard, C.accent3, "Despesas", "despesas",
+        "Contas vencidas, a vencer em 7 dias e pagas no período, com comprovante anexado."],
+      [x2, Fi.FiBookOpen, C.accent1, "Extrato", "extrato",
+        "Entradas, saídas e comissões pagas por período, com exportação em PDF."],
+    ];
+    for (const [x, Ic, bg, title, key, caption] of cols) {
+      await iconTile(s, Ic, x, 1.95, 0.55, bg);
+      s.addText(title, {
+        x: x + 0.75, y: 1.95, w: cw - 0.75, h: 0.55, fontSize: 18, bold: true, color: C.text2, valign: "middle", margin: 0, isTextBox: true, objectName: oname("half-title"),
+      });
+      await screen(s, key, x, 2.7, cw, 3.3);
+      s.addText(caption, {
+        x, y: 6.1, w: cw, h: 0.6, fontSize: 14, color: C.accent5, valign: "top", margin: 0, isTextBox: true, objectName: oname("half-caption"),
+      });
+    }
+    s.addNotes("Mostre a lista de despesas a pagar e o extrato dos últimos 30 dias.");
+  }
+
   // ── 8. Comissões ───────────────────────────────────────────────────────────
   {
     const s = content("Módulos", "Comissões calculadas sozinhas", "Do atendimento ao pagamento, sem conta no fim do mês");
-    const steps = [
-      [Fi.FiCheckCircle, "Atendimento realizado", "A presença é registrada na agenda."],
-      [Fi.FiPercent, "Comissão calculada", "O valor entra automaticamente na produção da profissional."],
-      [Fi.FiSearch, "Revisão da gestão", "A administração confere antes de pagar."],
-      [Fi.FiDownload, "Pagamento e planilha", "Registro do pagamento e exportação para Excel."],
+    const rows = [
+      [Fi.FiSliders, "Comissão do jeito da clínica", "Porcentagem ou valor fixo por aula, para cada fisioterapeuta."],
+      [Fi.FiCheckCircle, "Calculada a cada atendimento", "Presenças e faltas pagas entram sozinhas na produção."],
+      [Fi.FiSearch, "Revisão e pagamento", "A gestão confere, registra o pagamento e vê o que falta pagar."],
+      [Fi.FiDownload, "Planilha em Excel", "Produção do período exportada; cada fisioterapeuta vê só a dela."],
     ];
-    const cw = 2.85, gx = 0.25, y = 2.0;
-    for (let i = 0; i < steps.length; i++) {
-      const [Ic, t, d] = steps[i];
-      const x = MX + i * (cw + gx);
-      s.addShape(pres.shapes.ROUNDED_RECTANGLE, {
-        x, y, w: cw, h: 2.75, rectRadius: 0.12, fill: { color: C.background2 }, line: { color: C.accent6, width: 1 }, objectName: oname("step-card"),
-      });
-      s.addShape(pres.shapes.OVAL, {
-        x: x + 0.3, y: y + 0.3, w: 0.6, h: 0.6, fill: { color: C.text2 }, line: { color: C.text2 }, objectName: oname("step-num-bg"),
-      });
-      s.addText(String(i + 1), {
-        x: x + 0.3, y: y + 0.3, w: 0.6, h: 0.6, align: "center", valign: "middle", fontSize: 20, bold: true, color: C.background1, margin: 0, isTextBox: true, objectName: oname("step-num"),
-      });
-      await iconTile(s, Ic, x + cw - 0.85, y + 0.33, 0.55, C.accent6, HEX.skyDark);
-      s.addText(
-        [
-          { text: t, options: { bold: true, fontSize: 18, color: C.text2, breakLine: true } },
-          { text: d, options: { fontSize: 14, color: C.accent5 } },
-        ],
-        { x: x + 0.3, y: y + 1.15, w: cw - 0.55, h: 1.45, valign: "top", margin: 0, paraSpaceAfter: 4, isTextBox: true, objectName: oname("step-text") },
-      );
-      if (i < steps.length - 1) {
-        s.addShape(pres.shapes.RIGHT_ARROW, {
-          x: x + cw + 0.02, y: y + 1.25, w: 0.21, h: 0.3, fill: { color: C.accent1 }, line: { color: C.accent1 }, objectName: oname("step-arrow"),
-        });
-      }
-    }
-    s.addShape(pres.shapes.ROUNDED_RECTANGLE, {
-      x: MX, y: 5.15, w: W - 2 * MX, h: 1.15, rectRadius: 0.12, fill: { color: C.accent6 }, line: { color: C.accent6 }, objectName: "commission-callout-bg",
-    });
-    await iconTile(s, Fi.FiEye, MX + 0.3, 5.42, 0.6);
-    s.addText(
-      [
-        { text: "Cada fisioterapeuta acompanha a própria produção", options: { bold: true, fontSize: 18, color: C.text2, breakLine: true } },
-        { text: "Ela vê só a comissão dela. Os números da clínica ficam com a administração.", options: { fontSize: 14, color: C.accent4 } },
-      ],
-      { x: MX + 1.15, y: 5.27, w: 10.6, h: 0.95, valign: "middle", margin: 0, isTextBox: true, objectName: "commission-callout-text" },
-    );
+    for (let i = 0; i < rows.length; i++) await iconRow(s, rows[i][0], MX, 1.95 + i * 1.15, 5.8, rows[i][1], rows[i][2]);
+    await screen(s, "comissoes", 6.75, 1.95, 5.98, 4.3);
     s.addNotes(
-      "Ponto forte na venda: elimina o fechamento manual de comissão e reduz discussão com a equipe, porque cada profissional acompanha a própria produção.",
+      "Ponto forte na venda: elimina o fechamento manual de comissão. Mostre como a dona define porcentagem ou valor fixo na tela Equipe, e que cada fisioterapeuta acompanha só a própria produção.",
     );
   }
 
@@ -553,9 +558,9 @@ async function icon(Comp, color) {
       x: bx + 0.4, y: by + 0.35, w: bw - 0.8, h: 0.5, fontSize: 22, bold: true, color: C.text2, margin: 0, isTextBox: true, objectName: "contact-title",
     });
     const contacts = [
-      [Fi.FiUser, "Nome", "[seu nome]"],
-      [Fi.FiPhone, "WhatsApp", "[(65) 9 0000-0000]"],
-      [Fi.FiMail, "E-mail", "[seu e-mail]"],
+      [Fi.FiUser, "Nome", "André Macedo Taques"],
+      [Fi.FiPhone, "WhatsApp", "(65) 99338-9409"],
+      [Fi.FiMail, "E-mail", "andremacedotaques@gmail.com"],
     ];
     for (let i = 0; i < contacts.length; i++) {
       const cy = by + 1.15 + i * 0.9;
