@@ -656,3 +656,74 @@ export const HELP_FAQS: HelpFaq[] = [
     keywords: ["segurança", "privacidade", "dados", "lgpd", "sigilo"],
   },
 ];
+
+// Tutoriais sugeridos pelo botão "?" em cada tela (o primeiro que combinar vale).
+export type HelpContext = { title: string; articleIds: string[] };
+
+const HELP_CONTEXT_RULES: { pattern: RegExp; context: HelpContext }[] = [
+  {
+    pattern: /^\/pacientes\/[^/]+\/prontuario/,
+    context: {
+      title: "Prontuário",
+      articleIds: ["escrever-evolucao", "avaliacao-pilates", "anexar-documentos", "historico-aulas-paciente"],
+    },
+  },
+  {
+    pattern: /^\/pacientes/,
+    context: {
+      title: "Pacientes",
+      articleIds: ["cadastrar-paciente-com-pacote", "renovar-pacote", "editar-pausar-paciente", "escrever-evolucao"],
+    },
+  },
+  {
+    pattern: /^\/agenda/,
+    context: {
+      title: "Agenda",
+      articleIds: ["registrar-presenca-falta-reposicao", "marcar-aula-avulsa", "ver-minha-agenda"],
+    },
+  },
+  {
+    pattern: /^\/financeiro\/comissoes/,
+    context: { title: "Comissões", articleIds: ["pagar-comissao", "minha-producao", "alterar-comissao"] },
+  },
+  {
+    pattern: /^\/financeiro\/despesas/,
+    context: { title: "Despesas", articleIds: ["lancar-despesa", "extrato-relatorio"] },
+  },
+  {
+    pattern: /^\/financeiro\/extrato/,
+    context: { title: "Extrato", articleIds: ["extrato-relatorio", "lancar-despesa"] },
+  },
+  {
+    pattern: /^\/financeiro/,
+    context: {
+      title: "Financeiro",
+      articleIds: ["registrar-pagamento-parcela", "lancar-despesa", "extrato-relatorio", "pagar-comissao", "minha-producao"],
+    },
+  },
+  { pattern: /^\/atestados/, context: { title: "Atestados", articleIds: ["emitir-atestado", "configurar-clinica"] } },
+  { pattern: /^\/whatsapp/, context: { title: "WhatsApp", articleIds: ["whatsapp-confirmar-cobrar"] } },
+  {
+    pattern: /^\/equipe/,
+    context: { title: "Equipe", articleIds: ["convidar-fisioterapeuta", "alterar-comissao", "inativar-fisioterapeuta"] },
+  },
+  {
+    pattern: /^\/configuracoes/,
+    context: { title: "Configurações", articleIds: ["configurar-clinica", "comissao-padrao"] },
+  },
+  {
+    pattern: /^\/$/,
+    context: {
+      title: "Início",
+      articleIds: ["minha-producao", "registrar-presenca-falta-reposicao", "cadastrar-paciente-com-pacote", "instalar-no-celular"],
+    },
+  },
+];
+
+export function helpContextForPath(pathname: string): HelpContext | null {
+  return HELP_CONTEXT_RULES.find((rule) => rule.pattern.test(pathname))?.context ?? null;
+}
+
+export function contextRuleArticleIds(): string[] {
+  return HELP_CONTEXT_RULES.flatMap((rule) => rule.context.articleIds);
+}
