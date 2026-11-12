@@ -12,6 +12,7 @@ export const ptBR = {
     whatsapp: "WhatsApp",
     team: "Equipe",
     settings: "Configurações",
+    help: "Ajuda",
     logout: "Sair",
   },
   agenda: {

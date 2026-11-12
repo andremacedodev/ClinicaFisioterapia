@@ -22,6 +22,8 @@ import { Register } from "./pages/Register";
 import { SetupClinic } from "./pages/SetupClinic";
 import { InactiveAccess } from "./pages/InactiveAccess";
 import { ClinicSettings } from "./pages/ClinicSettings";
+import { Help } from "./pages/Help";
+import { HelpButton } from "./components/layout/HelpButton";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
 const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
@@ -68,13 +70,13 @@ const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 lg:flex">
       <Sidebar />
-      <main className="min-w-0 flex-1 px-4 pb-28 pt-5 sm:px-6 lg:ml-64 lg:p-8">
+      <main className="min-w-0 flex-1 px-4 pb-28 pt-5 sm:px-6 lg:ml-64 lg:p-8 lg:pb-28">
         <div className="max-w-7xl mx-auto">{children}</div>
       </main>
       {canShowBackToTop && showBackToTop && (
         <button
           type="button"
-          className="fixed bottom-6 right-4 z-40 inline-flex h-11 w-11 items-center justify-center rounded-full bg-brand-600 text-white shadow-lg shadow-brand-200 transition-all hover:bg-brand-700 active:scale-95 dark:shadow-none sm:bottom-8 sm:right-8"
+          className="fixed right-4 z-[65] inline-flex h-11 w-11 items-center justify-center rounded-full bg-brand-600 text-white shadow-lg shadow-brand-200 transition-all hover:bg-brand-700 active:scale-95 bottom-[calc(env(safe-area-inset-bottom)+9.5rem)] dark:shadow-none lg:bottom-24 lg:right-8"
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
           title="Voltar ao topo"
           aria-label="Voltar ao topo"
@@ -82,6 +84,7 @@ const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
           <ArrowUp size={20} />
         </button>
       )}
+      <HelpButton />
     </div>
   );
 };
@@ -177,6 +180,18 @@ function App() {
               </ProtectedLayout>
             }
           />
+
+          {["/ajuda", "/ajuda/:articleId"].map((path) => (
+            <Route
+              key={path}
+              path={path}
+              element={
+                <ProtectedLayout>
+                  <Help />
+                </ProtectedLayout>
+              }
+            />
+          ))}
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
