@@ -5,7 +5,6 @@ import {
   CreditCard, 
   ReceiptText,
   FileText,
-  Activity, 
   MessageSquare, 
   LogOut,
   UserCog,
@@ -19,6 +18,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { useAuth } from '../../context/AuthContext';
 import { messages } from '../../i18n';
+import { FisioOneMark, FisioOneWordmark } from '../brand/FisioOneLogo';
 
 export const Sidebar = () => {
   const location = useLocation();
@@ -48,12 +48,8 @@ export const Sidebar = () => {
     <>
     <aside className="hidden lg:flex w-64 h-screen bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex-col fixed left-0 top-0 z-50">
       <div className="p-6 flex items-center gap-3">
-        <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-brand-200 dark:shadow-none">
-          <Activity size={24} />
-        </div>
-        <span className="notranslate text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-400" translate="no">
-          {messages.app.brandName}
-        </span>
+        <FisioOneMark size={40} title={messages.app.brandName} />
+        <FisioOneWordmark className="text-xl" />
       </div>
 
       <nav className="flex-1 px-4 space-y-1 mt-4">
@@ -101,12 +97,8 @@ export const Sidebar = () => {
         <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-4 shadow-2xl">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-brand-600 rounded-xl flex items-center justify-center text-white">
-                <Activity size={20} />
-              </div>
-              <span className="notranslate text-base font-bold text-slate-900 dark:text-white" translate="no">
-                {messages.app.brandName}
-              </span>
+              <FisioOneMark size={36} title={messages.app.brandName} />
+              <FisioOneWordmark className="text-base" />
             </div>
             <button
               type="button"

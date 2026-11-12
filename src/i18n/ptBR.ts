@@ -1,6 +1,6 @@
 export const ptBR = {
   app: {
-    brandName: "Biofisio",
+    brandName: "FisioOne",
   },
   nav: {
     dashboard: "Dashboard",

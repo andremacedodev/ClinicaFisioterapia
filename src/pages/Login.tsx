@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 import { translateAuthError } from "../lib/authErrors";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
+import { FisioOneLogo } from "../components/brand/FisioOneLogo";
 import { Mail, Lock, ArrowRight } from "lucide-react";
 
 export const Login = () => {
@@ -35,11 +36,13 @@ export const Login = () => {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-2">
-          <img
-            src="/logo_biofisio.png"
-            alt="Logo da clínica"
-            className="w-120 h-120 object-contain mx-auto"
-          />
+          <h1 className="flex justify-center pb-2">
+            <FisioOneLogo
+              markSize={56}
+              wordmarkClassName="text-4xl"
+              tagline="Gestão para fisioterapia e pilates"
+            />
+          </h1>
           <p className="text-slate-500 dark:text-slate-400">
             Bem-vindo de volta à sua clínica.
           </p>
