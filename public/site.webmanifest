@@ -1,6 +1,6 @@
 {
-  "name": "Biofisio · Gestão para clínicas de fisioterapia",
-  "short_name": "Biofisio",
+  "name": "FisioOne · Gestão para clínicas de fisioterapia e pilates",
+  "short_name": "FisioOne",
   "description": "Agenda, prontuário, financeiro e notas fiscais para clínicas de fisioterapia e pilates.",
   "lang": "pt-BR",
   "start_url": "/",
@@ -14,9 +14,15 @@
       "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
-  "theme_color": "#FFFBF4",
-  "background_color": "#FFFBF4",
+  "theme_color": "#F8FAFC",
+  "background_color": "#F8FAFC",
   "display": "standalone"
 }

@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Activity, ArrowRight, Building, User } from "lucide-react";
+import { ArrowRight, Building, User } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
+import { FisioOneMark } from "../components/brand/FisioOneLogo";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 
@@ -181,8 +182,8 @@ export const SetupClinic = () => {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
       <div className="w-full max-w-lg space-y-8">
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-600 rounded-2xl text-white shadow-xl shadow-brand-200 dark:shadow-none mb-4">
-            <Activity size={32} />
+          <div className="flex justify-center mb-4">
+            <FisioOneMark size={64} title="FisioOne" />
           </div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
             {inviteLookupError
@@ -300,7 +301,7 @@ export const SetupClinic = () => {
                   required
                   disabled={loading}
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none transition-all disabled:opacity-60"
-                  placeholder="Biofisio Pilates"
+                  placeholder="Clínica Equilíbrio Pilates"
                   value={clinicName}
                   onChange={(event) => setClinicName(event.target.value)}
                 />

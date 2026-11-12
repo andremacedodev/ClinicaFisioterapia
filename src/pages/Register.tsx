@@ -4,7 +4,8 @@ import { supabase } from "../lib/supabase";
 import { translateAuthError } from "../lib/authErrors";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
-import { Activity, ArrowRight, Building, Lock, Mail, User } from "lucide-react";
+import { FisioOneMark } from "../components/brand/FisioOneLogo";
+import { ArrowRight, Building, Lock, Mail, User } from "lucide-react";
 
 type RegisterMode = "clinic" | "invite";
 
@@ -131,8 +132,8 @@ export const Register = () => {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 py-12">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-600 rounded-2xl text-white shadow-xl shadow-brand-200 dark:shadow-none mb-4">
-            <Activity size={32} />
+          <div className="flex justify-center mb-4">
+            <FisioOneMark size={64} title="FisioOne" />
           </div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Crie sua conta</h1>
           <p className="text-slate-500 dark:text-slate-400">
