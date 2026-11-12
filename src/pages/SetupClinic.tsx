@@ -25,7 +25,14 @@ export const SetupClinic = () => {
   }, [user?.user_metadata?.full_name]);
 
   const [fullName, setFullName] = useState(defaultName);
-  const [clinicName, setClinicName] = useState("");
+  // Nome da clínica digitado no cadastro (fica guardado na conta quando o
+  // e-mail precisa ser confirmado antes de entrar).
+  const [clinicName, setClinicName] = useState(() => {
+    const metadataClinic = user?.user_metadata?.clinic_name;
+    return typeof metadataClinic === "string" ? metadataClinic : "";
+  });
+  const [inviteLookupError, setInviteLookupError] = useState<string | null>(null);
+  const [lookupAttempt, setLookupAttempt] = useState(0);
   const [invitation, setInvitation] = useState<{
     id: string;
     clinic_id: string;
@@ -45,18 +52,28 @@ export const SetupClinic = () => {
         return;
       }
 
+      setCheckingInvite(true);
+      setInviteLookupError(null);
+
+      // Mais de um convite pendente (ex.: duas clínicas): usa o mais recente.
       const { data, error } = await supabase
         .from("professional_invitations")
         .select("id, clinic_id, full_name, role")
         .eq("email", user.email.toLowerCase())
         .eq("status", "pending")
-        .maybeSingle();
+        .order("created_at", { ascending: false })
+        .limit(1);
 
       if (!active) return;
 
-      if (!error && data) {
-        setInvitation(data as typeof invitation);
-        setFullName((data as { full_name: string }).full_name);
+      if (error) {
+        // Não oferecer "criar clínica" se não deu para conferir o convite:
+        // a fisioterapeuta convidada acabaria criando uma clínica nova.
+        setInviteLookupError(`Não foi possível verificar se existe convite para você: ${error.message}`);
+      } else if (data && data.length > 0) {
+        const found = data[0] as NonNullable<typeof invitation>;
+        setInvitation(found);
+        setFullName(found.full_name);
       }
 
       setCheckingInvite(false);
@@ -67,7 +84,7 @@ export const SetupClinic = () => {
     return () => {
       active = false;
     };
-  }, [user?.email]);
+  }, [user?.email, lookupAttempt]);
 
   const acceptInvitation = async () => {
     if (!user || !invitation) return;
@@ -168,14 +185,20 @@ export const SetupClinic = () => {
             <Activity size={32} />
           </div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
-            {invitation ? "Aceitar convite" : "Configurar administrador"}
+            {inviteLookupError
+              ? "Não foi possível continuar"
+              : invitation
+                ? "Aceitar convite"
+                : "Configurar administrador"}
           </h1>
           <p className="text-slate-500 dark:text-slate-400">
             {checkingInvite
               ? "Verificando se existe convite para este usuário."
-              : invitation
+              : inviteLookupError
+                ? "Confira a internet e tente de novo."
+                : invitation
                 ? "Você foi convidada para acessar a clínica como fisioterapeuta."
-                : "Seu login existe, mas a clínica e o perfil admin ainda não foram recriados."}
+                : "Falta só cadastrar a sua clínica para começar a usar o sistema."}
           </p>
         </div>
 
@@ -183,6 +206,18 @@ export const SetupClinic = () => {
           {checkingInvite ? (
             <div className="py-8 text-center text-sm text-slate-500">
               Verificando convite...
+            </div>
+          ) : inviteLookupError ? (
+            <div className="space-y-4">
+              <div role="alert" className="p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 rounded-xl text-rose-600 text-sm text-center">
+                {inviteLookupError}
+              </div>
+              <Button type="button" className="w-full" onClick={() => setLookupAttempt((n) => n + 1)}>
+                Tentar de novo
+              </Button>
+              <Button type="button" variant="outline" className="w-full" onClick={signOut}>
+                Sair
+              </Button>
             </div>
           ) : invitation ? (
             <div className="space-y-5">
