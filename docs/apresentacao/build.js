@@ -59,7 +59,7 @@ const PRINTS = {
   dashboard: "Dashboard (tela inicial)",
   agenda: "Agenda do dia",
   pacientes: "Cadastro do paciente / pacote",
-  prontuario: "Prontuário (evolução ou avaliação)",
+  prontuario: "Prontuário do paciente",
   financeiro: "Financeiro (visão geral ou recebimentos)",
   whatsapp: "WhatsApp (lista de pacientes)",
   atestados: "Atestados (formulário e prévia)",
@@ -91,7 +91,7 @@ async function icon(Comp, color) {
   const pres = new pptxgen();
   pres.layout = "LAYOUT_WIDE"; // 13.333 x 7.5
   pres.title = "FisioOne — Gestão para clínicas de fisioterapia e pilates";
-  pres.author = "André Macedo";
+  pres.author = "André Macedo Taques";
   pres.company = "FisioOne";
   pres.theme = { headFontFace: THEME.headFontFace, bodyFontFace: THEME.bodyFontFace };
   const C = pres.SchemeColor;
@@ -360,14 +360,14 @@ async function icon(Comp, color) {
   {
     const s = content("Módulos", "Prontuário eletrônico", "O histórico clínico de cada paciente, organizado e seguro");
     const rows = [
-      [Fi.FiEdit3, "Evoluções por atendimento", "Registro de cada sessão com o nome da profissional."],
-      [Fi.FiActivity, "Avaliação fisioterapêutica de Pilates", "Postural, testes funcionais, flexibilidade e força."],
+      [Fi.FiMic, "Evoluções com ditado por voz", "Fale e o texto aparece; use protocolos clínicos prontos."],
+      [Fi.FiActivity, "Avaliação fisioterapêutica de Pilates", "Postural, mobilidade, testes funcionais, flexibilidade e força."],
+      [Fi.FiClock, "Linha do tempo e histórico de aulas", "Presenças, faltas e a ficha clínica do paciente."],
       [Fi.FiPaperclip, "Exames e documentos anexados", "Arquivos privados, abertos só por quem tem acesso."],
-      [Fi.FiClock, "Histórico completo", "Tudo em ordem cronológica, fácil de consultar."],
     ];
     for (let i = 0; i < rows.length; i++) await iconRow(s, rows[i][0], MX, 1.95 + i * 1.15, 5.8, rows[i][1], rows[i][2]);
     await screen(s, "prontuario", 6.75, 1.95, 5.98, 4.3);
-    s.addNotes("Mostre uma avaliação de Pilates preenchida e uma evolução recente.");
+    s.addNotes("Mostre o ditado por voz numa evolução, os protocolos prontos e as abas de avaliação, histórico de aulas e documentos.");
   }
 
   // ── 7. Financeiro ──────────────────────────────────────────────────────────
@@ -553,9 +553,9 @@ async function icon(Comp, color) {
       x: bx + 0.4, y: by + 0.35, w: bw - 0.8, h: 0.5, fontSize: 22, bold: true, color: C.text2, margin: 0, isTextBox: true, objectName: "contact-title",
     });
     const contacts = [
-      [Fi.FiUser, "Nome", "[seu nome]"],
-      [Fi.FiPhone, "WhatsApp", "[(65) 9 0000-0000]"],
-      [Fi.FiMail, "E-mail", "[seu e-mail]"],
+      [Fi.FiUser, "Nome", "André Macedo Taques"],
+      [Fi.FiPhone, "WhatsApp", "(65) 99338-9409"],
+      [Fi.FiMail, "E-mail", "andremacedotaques@gmail.com"],
     ];
     for (let i = 0; i < contacts.length; i++) {
       const cy = by + 1.15 + i * 0.9;

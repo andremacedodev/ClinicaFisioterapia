@@ -25,6 +25,6 @@ npm install --no-save pptxgenjs react react-dom react-icons sharp
 node build.js
 ```
 
-Espaços sem print aparecem como "Espaço para print". O contato do último slide está entre colchetes para preencher.
+Espaços sem print aparecem como "Espaço para print".
 
 Os prints desta pasta já estão com dados fictícios (nomes, telefones, e-mails, CREFITO e valores). Nunca suba prints com dados reais de clientes.
