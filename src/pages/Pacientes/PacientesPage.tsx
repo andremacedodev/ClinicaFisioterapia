@@ -35,14 +35,9 @@ import { NovoPacienteModal } from "./NovoPacienteModal";
 import RegisterReceiptModal from "../../components/modals/RegisterReceiptModal";
 import { NewPatientForm, Patient, PatientProcedure } from "./types";
 import { activeFirst, withInactiveLabel } from "../../lib/professionals";
+import { PATIENT_STATUS_LABEL } from "../../lib/patientLabels";
 
-const STATUS_LABEL = {
-  ativo: "Ativo",
-  pausado: "Pausado",
-  inadimplente: "Inadimplente",
-  inativo: "Inativo",
-  encerrado: "Encerrado",
-} as const;
+const STATUS_LABEL = PATIENT_STATUS_LABEL;
 
 const WEEKDAY_LABEL = [
   "Domingo",
