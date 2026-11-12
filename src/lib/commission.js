@@ -62,11 +62,56 @@ function getCommissionClassValue(appointment) {
   return money(packageItem.lesson_value) || money(appointment.class_price);
 }
 
-function getCommissionAmount(appointment, classValue) {
+// Usada quando o banco ainda não tem regras (migration não aplicada) ou o
+// profissional não tem nenhuma regra cadastrada.
+export const DEFAULT_COMMISSION_RULE = Object.freeze({
+  commission_type: "percent",
+  commission_value: 40,
+});
+
+/**
+ * Regra de comissão do profissional que valia no momento `when`
+ * (a de maior valid_from <= when). Sem regra aplicável, retorna null.
+ */
+export function findCommissionRule(rules, professionalId, when) {
+  if (!Array.isArray(rules) || rules.length === 0 || !professionalId) return null;
+  const at = new Date(when).getTime();
+  let best = null;
+  let bestFrom = -Infinity;
+  let bestCreated = -Infinity;
+
+  for (const rule of rules) {
+    if (rule.professional_id !== professionalId) continue;
+    const from = new Date(rule.valid_from).getTime();
+    if (!(from <= at)) continue;
+    const created = rule.created_at ? new Date(rule.created_at).getTime() : 0;
+    if (from > bestFrom || (from === bestFrom && created > bestCreated)) {
+      best = rule;
+      bestFrom = from;
+      bestCreated = created;
+    }
+  }
+
+  return best;
+}
+
+/** Comissão de uma aula pela regra: % do valor da aula ou valor fixo. */
+export function commissionFromRule(rule, classValue) {
+  const applied = rule ?? DEFAULT_COMMISSION_RULE;
+  const value = money(applied.commission_value);
+  return applied.commission_type === "fixed" ? value : (money(classValue) * value) / 100;
+}
+
+/**
+ * Comissão de uma aula. Valor gravado na aula (commission_amount > 0) tem
+ * prioridade; senão vale a regra do profissional na data da aula.
+ */
+export function getCommissionAmount(appointment, classValue, rules = [], professionalId = null) {
   const configuredAmount = Number(appointment.commission_amount);
-  return Number.isFinite(configuredAmount) && configuredAmount > 0
-    ? configuredAmount
-    : classValue * 0.4;
+  if (Number.isFinite(configuredAmount) && configuredAmount > 0) return configuredAmount;
+
+  const rule = findCommissionRule(rules, professionalId, appointment.start_time);
+  return commissionFromRule(rule, classValue);
 }
 
 // Reposição é uma aula dada: conta como presença para produção e comissão.
@@ -78,7 +123,7 @@ export function isCommissionableAppointment(status) {
   return status !== "cancelada" && status !== "cancelled";
 }
 
-export function buildCommissionReport(appointments, ownerId = null, startDate, endDate) {
+export function buildCommissionReport(appointments, ownerId = null, startDate, endDate, commissionRules = []) {
   const report = new Map();
 
   let filtered = appointments.filter((appointment) => isCommissionableAppointment(appointment.status));
@@ -118,7 +163,12 @@ export function buildCommissionReport(appointments, ownerId = null, startDate, e
       };
 
     const classValue = getCommissionClassValue(appointment);
-    const commissionAmount = getCommissionAmount(appointment, classValue);
+    const commissionAmount = getCommissionAmount(
+      appointment,
+      classValue,
+      commissionRules,
+      professionalId,
+    );
     if (isHeldClass(appointment.status)) {
       current.gross += classValue;
       current.professionalShare += commissionAmount;
@@ -136,7 +186,7 @@ export function buildCommissionReport(appointments, ownerId = null, startDate, e
   return [...report.values()].sort((a, b) => a.professionalName.localeCompare(b.professionalName));
 }
 
-export function buildCommissionDetailReport(appointments, ownerId, startDate, endDate) {
+export function buildCommissionDetailReport(appointments, ownerId, startDate, endDate, commissionRules = []) {
   const dateColumns = new Set(listDateRange(startDate, endDate));
   const rows = new Map();
   const start = parseDateInput(startDate);
@@ -162,6 +212,8 @@ export function buildCommissionDetailReport(appointments, ownerId, startDate, en
       const commissionClassValue = getCommissionAmount(
         appointment,
         grossClassValue,
+        commissionRules,
+        professionalId,
       );
       const patientId = appointment.patient_id ?? "sem-paciente";
       // A renovação cria um novo pacote, mas não deve criar outra linha para

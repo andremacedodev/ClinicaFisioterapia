@@ -22,6 +22,7 @@ type PatientDB = {
   phone: string | null;
   email: string | null;
   birth_date: string | null;
+  responsible_professional_id?: string | null;
   procedures?: PatientProcedure[] | null;
   lesson_packages?: PackageDB[];
 };
@@ -427,6 +428,7 @@ function toPaciente(db: PatientDB): Paciente {
     telefone: db.phone ?? "",
     email: db.email ?? "",
     dataNascimento: db.birth_date ?? "",
+    responsavelId: db.responsible_professional_id ?? null,
     procedimentos,
     pacoteAtivo: pacote
       ? {
@@ -559,6 +561,7 @@ export async function getPacientes(
       phone,
       email,
       birth_date,
+      responsible_professional_id,
       procedures,
       lesson_packages (
         id,

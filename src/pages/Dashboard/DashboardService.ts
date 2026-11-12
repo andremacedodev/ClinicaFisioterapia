@@ -1,4 +1,6 @@
 import { supabase } from "../../lib/supabase";
+import { getCommissionAmount } from "../../lib/commission";
+import { loadCommissionRules, type CommissionRule } from "../../lib/commissionRules";
 import {
   BirthdayPatient,
   DashboardData,
@@ -30,6 +32,7 @@ type ProductionAppointmentRow = {
   start_time: string;
   status: string;
   class_price: number | string | null;
+  commission_amount?: number | string | null;
   lesson_packages: {
     total_lessons: number;
     lesson_value: number | string;
@@ -93,8 +96,19 @@ function isProductionAppointment(appointment: ProductionAppointmentRow): boolean
   );
 }
 
-function getProductionShare(appointment: ProductionAppointmentRow): number {
-  return getProductionClassValue(appointment) * 0.4;
+// Mesma regra do Financeiro: valor gravado na aula ou a regra de comissão
+// da profissional vigente na data da aula.
+function getProductionShare(
+  appointment: ProductionAppointmentRow,
+  rules: CommissionRule[],
+  professionalId: string,
+): number {
+  return getCommissionAmount(
+    appointment,
+    getProductionClassValue(appointment),
+    rules,
+    professionalId,
+  );
 }
 
 function isStandaloneProcedureIncome(transaction: TransactionRow): boolean {
@@ -173,6 +187,8 @@ function buildFinancialChart(
 
 function buildProductionChart(
   appointments: ProductionAppointmentRow[],
+  rules: CommissionRule[],
+  professionalId: string,
 ): FinancialChartPoint[] {
   const now = new Date();
   const months = Array.from({ length: 6 }, (_, index) => {
@@ -194,7 +210,7 @@ function buildProductionChart(
       const bucket = byMonth.get(monthKey(new Date(appointment.start_time)));
       if (!bucket) return;
 
-      bucket.faturamento += getProductionShare(appointment);
+      bucket.faturamento += getProductionShare(appointment, rules, professionalId);
       bucket.saldo = bucket.faturamento;
     });
 
@@ -206,10 +222,17 @@ function buildProductionChart(
   }));
 }
 
-function sumProduction(appointments: ProductionAppointmentRow[]): number {
+function sumProduction(
+  appointments: ProductionAppointmentRow[],
+  rules: CommissionRule[],
+  professionalId: string,
+): number {
   return appointments
     .filter(isProductionAppointment)
-    .reduce((total, appointment) => total + getProductionShare(appointment), 0);
+    .reduce(
+      (total, appointment) => total + getProductionShare(appointment, rules, professionalId),
+      0,
+    );
 }
 
 function birthdayThisYear(birthDate: string, reference: Date): Date {
@@ -324,6 +347,7 @@ export async function getDashboardData(
       monthAppointmentsResult,
       chartAppointmentsResult,
       birthdayPatientsResult,
+      commissionRulesResult,
     ] = await Promise.all([
       patientsCountQuery,
       appointmentsCountQuery,
@@ -335,6 +359,7 @@ export async function getDashboardData(
             start_time,
             status,
             class_price,
+            commission_amount,
             lesson_packages (
               total_lessons,
               lesson_value,
@@ -354,6 +379,7 @@ export async function getDashboardData(
             start_time,
             status,
             class_price,
+            commission_amount,
             lesson_packages (
               total_lessons,
               lesson_value,
@@ -366,6 +392,7 @@ export async function getDashboardData(
         .eq("professional_id", access.id)
         .gte("start_time", sixMonthsStart.toISOString()),
       birthdayPatientsQuery,
+      loadCommissionRules(clinicId),
     ]);
 
     const results = [
@@ -381,6 +408,11 @@ export async function getDashboardData(
       throw new Error(`Erro ao carregar dashboard: ${failed.error.message}`);
     }
 
+    if (commissionRulesResult.error) {
+      throw new Error(`Erro ao carregar as regras de comissão: ${commissionRulesResult.error}`);
+    }
+    const commissionRules = commissionRulesResult.rules;
+
     const monthAppointments =
       (monthAppointmentsResult.data ?? []) as unknown as ProductionAppointmentRow[];
     const chartAppointments =
@@ -390,10 +422,10 @@ export async function getDashboardData(
       stats: {
         activePatients: patientsCountResult.count ?? 0,
         todayAppointments: appointmentsCountResult.count ?? 0,
-        monthRevenue: sumProduction(monthAppointments),
+        monthRevenue: sumProduction(monthAppointments, commissionRules, access.id),
         overdueAmount: 0,
       },
-      chartData: buildProductionChart(chartAppointments),
+      chartData: buildProductionChart(chartAppointments, commissionRules, access.id),
       birthdays: mapBirthdays(
         (birthdayPatientsResult.data ?? []) as PatientRow[],
       ),

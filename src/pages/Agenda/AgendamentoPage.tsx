@@ -23,6 +23,7 @@ import {
   StatusAgendamento,
 } from "./types";
 import "./agendamento.css";
+import { loadCommissionRules, type CommissionRule } from "../../lib/commissionRules";
 import {
   activeFirst,
   isActiveProfessional,
@@ -141,6 +142,7 @@ export const AgendamentoPage: React.FC = () => {
   const [mes, setMes] = useState(mesInicial - 1);
   const [dataSelecionada, setDataSelecionada] = useState<string>(dataHoje);
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
+  const [commissionRules, setCommissionRules] = useState<CommissionRule[]>([]);
   const [fisioterapeutas, setFisioterapeutas] = useState<Fisioterapeuta[]>([]);
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [modalAberto, setModalAberto] = useState(false);
@@ -194,13 +196,21 @@ export const AgendamentoPage: React.FC = () => {
       setErro(null);
 
       try {
-        const [agenda, profissionais, listaPacientes] = await Promise.all([
+        const [agenda, profissionais, listaPacientes, regrasComissao] = await Promise.all([
           getAgendamentosPorMes(ano, mes, profile),
           getFisioterapeutas(profile),
           getPacientes(profile),
+          profile?.clinic_id
+            ? loadCommissionRules(profile.clinic_id)
+            : Promise.resolve({ supported: false, rules: [] as CommissionRule[] }),
         ]);
 
         if (!ativo) return;
+
+        if ("error" in regrasComissao && regrasComissao.error) {
+          throw new Error(`Erro ao carregar as regras de comissão: ${regrasComissao.error}`);
+        }
+        setCommissionRules(regrasComissao.rules);
 
         setAgendamentos(agenda);
         setFisioterapeutas(profissionais);
@@ -765,6 +775,7 @@ export const AgendamentoPage: React.FC = () => {
         agendamento={agendamentoEditando}
         pacientes={pacientes}
         fisioterapeutas={fisioterapeutas}
+        commissionRules={commissionRules}
         dataInicial={dataSelecionada}
         pacienteInicialId={pacienteInicialId}
         onFechar={fecharModal}
