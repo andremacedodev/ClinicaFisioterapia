@@ -11,15 +11,18 @@ import {
   Settings,
   HelpCircle,
   MoreHorizontal,
+  Bell,
   X
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { useAuth } from '../../context/AuthContext';
 import { messages } from '../../i18n';
 import { FisioOneMark, FisioOneWordmark } from '../brand/FisioOneLogo';
 import { useClinicDisplayName } from '../brand/useClinicDisplayName';
+import { NotificationBadge, NotificationBell, NotificationList } from '../notifications/NotificationBell';
+import { useBirthdayNotifications } from '../notifications/useBirthdayNotifications';
 
 export const Sidebar = () => {
   const location = useLocation();
@@ -28,6 +31,12 @@ export const Sidebar = () => {
   const isAdmin = profile?.role === "admin";
   // Topo do menu: nome configurado da clínica; sem nome, "FisioOne".
   const clinicName = useClinicDisplayName(profile?.clinic_id);
+  // Sino de avisos: aniversariantes de hoje e dos próximos 7 dias.
+  const notifications = useBirthdayNotifications(profile);
+  const { markSeen } = notifications;
+  useEffect(() => {
+    if (isMoreOpen) markSeen();
+  }, [isMoreOpen, markSeen]);
   const menuItems = [
     { icon: LayoutDashboard, label: messages.nav.dashboard, path: '/' },
     { icon: Calendar, label: messages.nav.agenda, path: '/agenda' },
@@ -50,7 +59,7 @@ export const Sidebar = () => {
   return (
     <>
     <aside className="hidden lg:flex w-64 h-screen bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex-col fixed left-0 top-0 z-50">
-      <div className="p-6 flex items-center gap-3">
+      <div className="p-6 pr-4 flex items-center gap-3">
         <FisioOneMark size={40} title={messages.app.brandName} />
         {clinicName ? (
           <span
@@ -66,6 +75,9 @@ export const Sidebar = () => {
         ) : (
           <FisioOneWordmark className="text-xl" />
         )}
+        <div className="ml-auto">
+          <NotificationBell notifications={notifications} />
+        </div>
       </div>
 
       <nav className="flex-1 px-4 space-y-1 mt-4">
@@ -136,6 +148,18 @@ export const Sidebar = () => {
             </button>
           </div>
 
+          {(notifications.birthdays.length > 0 || notifications.error) && (
+            <section className="mb-3" aria-label="Avisos">
+              <h2 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+                <Bell size={14} aria-hidden="true" />
+                Avisos
+              </h2>
+              <div className="max-h-[40vh] overflow-y-auto">
+                <NotificationList notifications={notifications} />
+              </div>
+            </section>
+          )}
+
           <div className="grid grid-cols-2 gap-2">
             {secondaryMobileItems.map((item) => {
               const isActive = isActivePath(item.path);
@@ -201,8 +225,16 @@ export const Sidebar = () => {
               : "text-slate-500 dark:text-slate-400"
           )}
           onClick={() => setIsMoreOpen(true)}
+          aria-label={
+            notifications.unseenCount > 0
+              ? `Mais opções. ${notifications.unseenCount} ${notifications.unseenCount === 1 ? "aniversariante" : "aniversariantes"} hoje`
+              : undefined
+          }
         >
-          <MoreHorizontal size={21} />
+          <span className="relative">
+            <MoreHorizontal size={21} />
+            <NotificationBadge count={notifications.unseenCount} className="-right-3 -top-2" />
+          </span>
           <span>Mais</span>
         </button>
       </div>
