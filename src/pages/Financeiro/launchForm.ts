@@ -38,7 +38,8 @@ export type LaunchCreate = {
   professionalId: string;
   day: string;
   time: string;
-  mark: "P" | "F";
+  /** P presença, F falta, R reposição, J ausência justificada. */
+  mark: "P" | "F" | "R" | "J";
   /** Posição desta aula entre as novas do mesmo paciente (0, 1, 2…), em ordem de data. */
   orderInPatient: number;
 };
@@ -90,7 +91,16 @@ export function buildLaunchForm(
       : TIPOS.includes(procedure?.name as TipoSessao)
         ? (procedure?.name as TipoSessao)
         : "Fisioterapia",
-    status: mark === "P" ? "presenca_registrada" : "falta",
+    // Ausência justificada é criada como agendada e depois marcada com
+    // atualizarStatusAgendamento, que aplica o limite do pacote (igual à Agenda).
+    status:
+      mark === "P"
+        ? "presenca_registrada"
+        : mark === "F"
+          ? "falta"
+          : mark === "R"
+            ? "reposicao"
+            : "agendada",
     observacoes: pacote
       ? `Lançada pela grade. Aula ${sessionNumber}/${pacote.totalAulas} do pacote.`
       : "Lançada pela grade.",

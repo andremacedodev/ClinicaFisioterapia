@@ -56,7 +56,7 @@ test('aulas pagas batem com a planilha de comissão', () => {
   assert.deepEqual(fromGrid, fromSheet);
 });
 
-import { editableCell, nextCellMark, usualTime } from '../src/lib/launchGrid.js';
+import { editableCell, usualTime, CHOOSABLE_MARKS } from '../src/lib/launchGrid.js';
 
 test('quais células a grade deixa editar', () => {
   const item = (mark, id = 'x') => ({ id, mark, status: '', time: '08:00', startTime: '' });
@@ -64,20 +64,14 @@ test('quais células a grade deixa editar', () => {
   assert.equal(editableCell([], '2026-11-27', '2026-11-26').editable, false); // futuro
   assert.equal(editableCell([], '2026-11-26', '2026-11-26').editable, true); // hoje pode
   assert.deepEqual(editableCell([item('A', 'a1')], '2026-11-10', '2026-11-26'), { editable: true, baseMark: 'A', appointmentId: 'a1' });
-  assert.equal(editableCell([item('R')], '2026-11-10', '2026-11-26').editable, false);
-  assert.equal(editableCell([item('J')], '2026-11-10', '2026-11-26').editable, false);
+  assert.deepEqual(editableCell([item('R', 'r1')], '2026-11-10', '2026-11-26'), { editable: true, baseMark: 'R', appointmentId: 'r1' });
+  assert.deepEqual(editableCell([item('J', 'j1')], '2026-11-10', '2026-11-26'), { editable: true, baseMark: 'J', appointmentId: 'j1' });
+  assert.equal(editableCell([item('?')], '2026-11-10', '2026-11-26').editable, false);
   assert.equal(editableCell([item('P'), item('P', 'y')], '2026-11-10', '2026-11-26').editable, false);
 });
 
-test('ciclo de cliques', () => {
-  assert.equal(nextCellMark(null, null), 'P');
-  assert.equal(nextCellMark(null, 'P'), 'F');
-  assert.equal(nextCellMark(null, 'F'), null);
-  assert.equal(nextCellMark('A', 'A'), 'P');
-  assert.equal(nextCellMark('A', 'F'), 'A');
-  assert.equal(nextCellMark('P', 'P'), 'F');
-  assert.equal(nextCellMark('P', 'F'), 'P');
-  assert.equal(nextCellMark('F', 'F'), 'P');
+test('opções do menu da célula', () => {
+  assert.deepEqual(CHOOSABLE_MARKS, ['P', 'F', 'R', 'J']);
 });
 
 test('horário mais comum do paciente', () => {

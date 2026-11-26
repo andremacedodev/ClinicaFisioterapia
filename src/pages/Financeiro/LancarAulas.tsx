@@ -21,10 +21,11 @@ import {
   buildLaunchGrid,
   editableCell,
   localDay,
-  nextCellMark,
+  CHOOSABLE_MARKS,
   usualTime,
   type LaunchAppointment,
   type LaunchCellItem,
+  type EditableMark,
   type LaunchMark,
 } from "../../lib/launchGrid";
 import {
@@ -41,7 +42,7 @@ import {
 } from "./launchForm";
 
 type Professional = { id: string; full_name: string; role: string; active?: boolean };
-type ShownMark = "A" | "P" | "F" | null;
+type ShownMark = EditableMark | null;
 /** Alteração pendente: chave "pacienteId|dia". */
 type Pending = Record<string, ShownMark>;
 type ChangeItem = {
@@ -50,14 +51,40 @@ type ChangeItem = {
   patientName: string;
   day: string;
   kind: "create" | "update";
-  mark: "P" | "F" | "A";
+  mark: EditableMark;
   from: ShownMark;
   appointmentId?: string;
 };
-type SaveResult = { ok: number; failures: Array<{ label: string; reason: string }> };
+type SaveResult = {
+  ok: number;
+  failures: Array<{ label: string; reason: string }>;
+  /** Avisos de lançamentos salvos com ajuste (ex.: ausência justificada virou falta). */
+  notices: string[];
+};
+type CellMenu = {
+  key: string;
+  patientId: string;
+  patientName: string;
+  day: string;
+  base: ShownMark;
+  top: number;
+  left: number;
+};
 
-const MARK_TO_STATUS = { P: "presenca_registrada", F: "falta", A: "agendada" } as const;
-const MARK_WORD = { P: "Presença", F: "Falta", A: "Agendada" } as const;
+const MARK_TO_STATUS = {
+  P: "presenca_registrada",
+  F: "falta",
+  R: "reposicao",
+  J: "ausencia_justificada",
+  A: "agendada",
+} as const;
+const MARK_WORD = {
+  P: "Presença",
+  F: "Falta",
+  R: "Reposição",
+  J: "Ausência justificada",
+  A: "Agendada",
+} as const;
 
 const WEEKDAY_LETTER = ["D", "S", "T", "Q", "Q", "S", "S"];
 const MONTH_LABEL = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" });
@@ -134,6 +161,7 @@ export const FinancialLaunchClasses = () => {
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [result, setResult] = useState<SaveResult | null>(null);
   const [hint, setHint] = useState<string | null>(null);
+  const [menu, setMenu] = useState<CellMenu | null>(null);
 
   // Fisioterapeutas da clínica (ativas primeiro; inativas marcadas).
   useEffect(() => {
@@ -304,18 +332,51 @@ export const FinancialLaunchClasses = () => {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [hasPending]);
 
-  const clickCell = (patientId: string, day: string, base: ShownMark) => {
-    const key = `${patientId}|${day}`;
+  const openMenu = (
+    target: HTMLElement,
+    patientId: string,
+    patientName: string,
+    day: string,
+    base: ShownMark,
+  ) => {
+    const rect = target.getBoundingClientRect();
+    const width = 232;
+    const height = 300;
+    const left = Math.min(Math.max(8, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - 8);
+    const below = rect.bottom + 6;
+    const top = below + height > window.innerHeight ? Math.max(8, rect.top - height - 6) : below;
+    setMenu({ key: `${patientId}|${day}`, patientId, patientName, day, base, top, left });
+  };
+
+  const chooseMark = (mark: ShownMark) => {
+    if (!menu) return;
+    const { key, base } = menu;
     setPending((current) => {
-      const shown = key in current ? current[key] : base;
-      const next = nextCellMark(base, shown) as ShownMark;
       const copy = { ...current };
-      if (next === base) delete copy[key];
-      else copy[key] = next;
+      if (mark === base) delete copy[key];
+      else copy[key] = mark;
       return copy;
     });
+    setMenu(null);
     setResult(null);
   };
+
+  // Fecha o menu com Esc, clique fora, rolagem ou mudança de tamanho.
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [menu]);
 
   const openReview = () => {
     const initial: Record<string, string> = {};
@@ -332,6 +393,7 @@ export const FinancialLaunchClasses = () => {
     setSaving(true);
     setProgress({ done: 0, total: changes.length });
     const failures: SaveResult["failures"] = [];
+    const notices: string[] = [];
     let ok = 0;
     const orderByPatient = new Map<string, number>();
 
@@ -343,8 +405,14 @@ export const FinancialLaunchClasses = () => {
       const label = `${change.patientName}, ${formatDay(change.day)}`;
       try {
         if (change.kind === "update" && change.appointmentId) {
-          await atualizarStatusAgendamento(change.appointmentId, MARK_TO_STATUS[change.mark]);
-        } else if (change.mark === "P" || change.mark === "F") {
+          const finalStatus = await atualizarStatusAgendamento(
+            change.appointmentId,
+            MARK_TO_STATUS[change.mark],
+          );
+          if (change.mark === "J" && finalStatus === "falta") {
+            notices.push(`${label}: virou falta (limite de ausências justificadas do pacote).`);
+          }
+        } else if (change.mark !== "A") {
           const order = orderByPatient.get(change.patientId) ?? 0;
           orderByPatient.set(change.patientId, order + 1);
           const form = buildLaunchForm(
@@ -359,7 +427,22 @@ export const FinancialLaunchClasses = () => {
             },
             rules,
           );
-          await criarAgendamento(clinicId, form);
+          const created = await criarAgendamento(clinicId, form);
+          if (change.mark === "J") {
+            // Igual à Agenda: aplica o limite de ausências justificadas do pacote.
+            try {
+              const finalStatus = await atualizarStatusAgendamento(created.id, "ausencia_justificada");
+              if (finalStatus === "falta") {
+                notices.push(`${label}: virou falta (limite de ausências justificadas do pacote).`);
+              }
+            } catch (justifyError) {
+              throw new Error(
+                `a aula foi criada como agendada, mas não foi possível marcar a ausência justificada: ${
+                  justifyError instanceof Error ? justifyError.message : String(justifyError)
+                }`,
+              );
+            }
+          }
         }
         ok += 1;
       } catch (saveError) {
@@ -374,7 +457,7 @@ export const FinancialLaunchClasses = () => {
     setSaving(false);
     setReviewOpen(false);
     setPending({});
-    setResult({ ok, failures });
+    setResult({ ok, failures, notices });
     await load();
     // Pacotes mudaram (aulas consumidas): recarrega para os próximos lançamentos.
     try {
@@ -457,16 +540,23 @@ export const FinancialLaunchClasses = () => {
           role="status"
           className={clsx(
             "rounded-xl border p-3 text-sm",
-            result.failures.length
+            result.failures.length || result.notices.length
               ? "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-100"
               : "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-200",
           )}
         >
           <p className="flex items-center gap-2 font-semibold">
-            {result.failures.length ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
+            {result.failures.length || result.notices.length ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
             {result.ok} {result.ok === 1 ? "lançamento salvo" : "lançamentos salvos"}
             {result.failures.length ? `, ${result.failures.length} com erro` : "."}
           </p>
+          {result.notices.length > 0 && (
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {result.notices.map((notice) => (
+                <li key={notice}>{notice}</li>
+              ))}
+            </ul>
+          )}
           {result.failures.length > 0 && (
             <ul className="mt-2 list-disc space-y-1 pl-5">
               {result.failures.map((failure) => (
@@ -630,16 +720,18 @@ export const FinancialLaunchClasses = () => {
                           {cell.editable ? (
                             <button
                               type="button"
-                              onClick={() => clickCell(row.patientId, day, base)}
+                              onClick={(event) => openMenu(event.currentTarget, row.patientId, row.name, day, base)}
+                              aria-haspopup="menu"
+                              aria-expanded={menu?.key === key}
                               disabled={saving}
                               className={clsx(
                                 "group inline-flex h-8 w-8 items-center justify-center rounded-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500",
                                 !shown && "hover:bg-brand-50 dark:hover:bg-brand-900/30",
                               )}
-                              title={`${describe}\nClique para lançar: presença → falta → ${base === "A" ? "agendada" : base ? (base === "P" ? "presença" : "falta") : "vazio"}`}
+                              title={`${describe}\nClique para escolher: presença, falta, reposição ou ausência justificada`}
                               aria-label={`${row.name}, ${formatDay(day)}: ${
                                 shown ? MARK_WORD[shown] : "sem aula"
-                              }${changed ? " (alteração não salva)" : ""}. Clique para mudar.`}
+                              }${changed ? " (alteração não salva)" : ""}. Clique para escolher.`}
                             >
                               {shown ? (
                                 <span
@@ -695,9 +787,9 @@ export const FinancialLaunchClasses = () => {
       </Card>
 
       <p className="text-xs text-slate-500 dark:text-slate-400">
-        Clique numa célula para lançar: presença → falta → volta como estava. Dias futuros,
-        reposições, ausências justificadas e dias com duas aulas são ajustados pela Agenda. A
-        contagem é a mesma da planilha de comissão exportada.
+        Clique numa célula e escolha presença, falta, reposição ou ausência justificada. Dias
+        futuros e dias com duas aulas são ajustados pela Agenda. A contagem é a mesma da
+        planilha de comissão exportada.
       </p>
 
       {hint && (
@@ -725,6 +817,62 @@ export const FinancialLaunchClasses = () => {
                 Revisar e salvar
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {menu && (
+        <div className="fixed inset-0 z-[75]" onMouseDown={() => setMenu(null)}>
+          <div
+            role="menu"
+            aria-label={`Lançar ${menu.patientName}, ${formatDay(menu.day)}`}
+            className="fixed w-[232px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+            style={{ top: menu.top, left: menu.left }}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <p className="truncate border-b border-slate-100 px-3 py-2 text-xs font-semibold text-slate-500 dark:border-slate-800">
+              {menu.patientName} · {formatDay(menu.day)}
+            </p>
+            <div className="p-1">
+              {CHOOSABLE_MARKS.map((mark, index) => {
+                const current = (menu.key in pending ? pending[menu.key] : menu.base) === mark;
+                return (
+                  <button
+                    key={mark}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={current}
+                    autoFocus={index === 0}
+                    onClick={() => chooseMark(mark)}
+                    className={clsx(
+                      "flex min-h-11 w-full items-center gap-3 rounded-lg px-2 text-left text-sm outline-none hover:bg-slate-50 focus-visible:bg-slate-100 dark:hover:bg-slate-800 dark:focus-visible:bg-slate-800",
+                      current && "font-semibold",
+                    )}
+                  >
+                    <span className={clsx("inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-[11px] font-bold", MARK_INFO[mark].className)}>
+                      {mark}
+                    </span>
+                    <span className="flex-1">{MARK_WORD[mark]}</span>
+                    {current && <CheckCircle2 size={16} className="text-brand-600" aria-hidden="true" />}
+                  </button>
+                );
+              })}
+            </div>
+            {(menu.key in pending || menu.base === null) && (
+              <div className="border-t border-slate-100 p-1 dark:border-slate-800">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => chooseMark(menu.base)}
+                  className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 text-left text-sm text-slate-600 outline-none hover:bg-slate-50 focus-visible:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  <RotateCcw size={16} className="ml-1 mr-1" aria-hidden="true" />
+                  {menu.base === null
+                    ? "Sem aula"
+                    : `Voltar como estava (${MARK_WORD[menu.base]})`}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
