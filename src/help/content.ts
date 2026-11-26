@@ -535,7 +535,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       },
       {
         text: "Clique em **Inativar acesso**. Ela perde o acesso na hora. As aulas que ela já deu, as evoluções e as comissões continuam no histórico com o nome dela.",
-        tip: "Na comissão, as aulas que já aconteceram continuam contando para ela, mesmo nos pacientes transferidos. As aulas a partir do momento da troca contam para quem assumiu.",
+        tip: "A comissão de cada aula vai para a fisioterapeuta que está na agenda daquela aula. As aulas transferidas (do momento da troca em diante) contam para quem assumiu.",
       },
       { text: "Se ela voltar, é só clicar em **Reativar**, na lista de **Profissionais inativos**." },
     ],

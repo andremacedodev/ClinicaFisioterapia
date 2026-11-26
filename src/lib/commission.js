@@ -26,28 +26,21 @@ function listDateRange(startDate, endDate) {
   return Array.from({ length: days }, (_, index) => toDateInputValue(addDays(start, index)));
 }
 
+// A comissão da aula vai para a fisioterapeuta da agenda (quem deu a aula).
+// Só quando a aula não tem profissional usa a responsável do paciente.
 export function getAppointmentResponsibleProfessional(appointment) {
-  // Gravado quando a responsável do paciente mudou depois da aula:
-  // a comissão fica com quem era responsável na data da aula.
-  const recorded = appointment.commission_professional;
-  if (appointment.commission_professional_id || recorded?.id) {
+  const professional = appointment.profiles;
+  if (professional?.id) {
     return {
-      id: recorded?.id ?? appointment.commission_professional_id,
-      full_name: recorded?.full_name ?? "Profissional removida",
+      id: professional.id,
+      full_name: professional.full_name ?? "Sem profissional definido",
     };
   }
 
   const responsible = appointment.patients?.profiles;
-  if (responsible?.id || responsible?.full_name) {
-    return {
-      id: responsible.id ?? "sem-profissional",
-      full_name: responsible.full_name ?? "Sem profissional definido",
-    };
-  }
-
   return {
-    id: appointment.profiles?.id ?? "sem-profissional",
-    full_name: appointment.profiles?.full_name ?? "Sem profissional definido",
+    id: responsible?.id ?? "sem-profissional",
+    full_name: responsible?.full_name ?? "Sem profissional definido",
   };
 }
 
