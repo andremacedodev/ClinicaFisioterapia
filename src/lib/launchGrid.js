@@ -41,10 +41,15 @@ export function localDay(isoDateTime) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-/** Hora local HH:MM. */
+/** Hora HH:MM no fuso da clínica, igual à Agenda (Agendamentoservice). */
+const CLINIC_TIME = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
 export function localTime(isoDateTime) {
-  const date = new Date(isoDateTime);
-  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return CLINIC_TIME.format(new Date(isoDateTime));
 }
 
 /** Todos os dias do mês "AAAA-MM". */
@@ -122,4 +127,56 @@ export function buildLaunchGrid({ appointments, patients, month, professionalId 
   });
 
   return { days, rows: sortedRows, totals };
+}
+
+// ── Edição pela grade (bloco 2) ─────────────────────────────────────────────
+
+/**
+ * Se a célula pode ser editada pela grade e qual é a marca de partida.
+ * Só dias até hoje; célula vazia, ou com UMA aula agendada/presença/falta.
+ */
+export function editableCell(items, day, today) {
+  if (day > today) return { editable: false, reason: "Dia futuro: lance pela Agenda." };
+  const list = items ?? [];
+  if (list.length === 0) return { editable: true, baseMark: null };
+  if (list.length > 1) {
+    return { editable: false, reason: "Mais de uma aula neste dia: ajuste pela Agenda." };
+  }
+  const [item] = list;
+  if (["A", "P", "F"].includes(item.mark)) {
+    return { editable: true, baseMark: item.mark, appointmentId: item.id };
+  }
+  return {
+    editable: false,
+    reason: `${item.mark === "R" ? "Reposição" : item.mark === "J" ? "Ausência justificada" : "Este status"}: ajuste pela Agenda.`,
+  };
+}
+
+const CYCLES = {
+  none: [null, "P", "F"],
+  A: ["A", "P", "F"],
+  P: ["P", "F"],
+  F: ["F", "P"],
+};
+
+/** Próxima marca ao clicar, a partir da marca original e da mostrada agora. */
+export function nextCellMark(baseMark, shownMark) {
+  const cycle = CYCLES[baseMark ?? "none"];
+  const index = cycle.indexOf(shownMark ?? null);
+  return cycle[(index + 1) % cycle.length];
+}
+
+/** Horário mais frequente das aulas do paciente (para a aula nova). */
+export function usualTime(row) {
+  const counts = new Map();
+  Object.values(row?.cells ?? {}).forEach((items) =>
+    items.forEach((item) => counts.set(item.time, (counts.get(item.time) ?? 0) + 1)),
+  );
+  let best = null;
+  counts.forEach((count, time) => {
+    if (!best || count > best.count || (count === best.count && time < best.time)) {
+      best = { time, count };
+    }
+  });
+  return best?.time ?? null;
 }

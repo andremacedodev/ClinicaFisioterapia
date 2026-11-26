@@ -46,3 +46,20 @@ export declare function buildLaunchGrid(options: {
   month: string;
   professionalId: string;
 }): { days: string[]; rows: LaunchRow[]; totals: LaunchTotals };
+
+export type EditableCell =
+  | { editable: true; baseMark: "A" | "P" | "F" | null; appointmentId?: string }
+  | { editable: false; reason: string };
+
+export declare function editableCell(
+  items: LaunchCellItem[] | undefined,
+  day: string,
+  today: string,
+): EditableCell;
+
+export declare function nextCellMark(
+  baseMark: "A" | "P" | "F" | null,
+  shownMark: "A" | "P" | "F" | null,
+): "A" | "P" | "F" | null;
+
+export declare function usualTime(row: LaunchRow | undefined): string | null;

@@ -55,3 +55,35 @@ test('aulas pagas batem com a planilha de comissão', () => {
   const fromGrid = Object.fromEntries(grid.rows.map((row) => [row.patientId, row.totals.paid]));
   assert.deepEqual(fromGrid, fromSheet);
 });
+
+import { editableCell, nextCellMark, usualTime } from '../src/lib/launchGrid.js';
+
+test('quais células a grade deixa editar', () => {
+  const item = (mark, id = 'x') => ({ id, mark, status: '', time: '08:00', startTime: '' });
+  assert.deepEqual(editableCell([], '2026-11-10', '2026-11-26'), { editable: true, baseMark: null });
+  assert.equal(editableCell([], '2026-11-27', '2026-11-26').editable, false); // futuro
+  assert.equal(editableCell([], '2026-11-26', '2026-11-26').editable, true); // hoje pode
+  assert.deepEqual(editableCell([item('A', 'a1')], '2026-11-10', '2026-11-26'), { editable: true, baseMark: 'A', appointmentId: 'a1' });
+  assert.equal(editableCell([item('R')], '2026-11-10', '2026-11-26').editable, false);
+  assert.equal(editableCell([item('J')], '2026-11-10', '2026-11-26').editable, false);
+  assert.equal(editableCell([item('P'), item('P', 'y')], '2026-11-10', '2026-11-26').editable, false);
+});
+
+test('ciclo de cliques', () => {
+  assert.equal(nextCellMark(null, null), 'P');
+  assert.equal(nextCellMark(null, 'P'), 'F');
+  assert.equal(nextCellMark(null, 'F'), null);
+  assert.equal(nextCellMark('A', 'A'), 'P');
+  assert.equal(nextCellMark('A', 'F'), 'A');
+  assert.equal(nextCellMark('P', 'P'), 'F');
+  assert.equal(nextCellMark('P', 'F'), 'P');
+  assert.equal(nextCellMark('F', 'F'), 'P');
+});
+
+test('horário mais comum do paciente', () => {
+  const row = { cells: {
+    '2026-11-02': [{ time: '08:00' }], '2026-11-04': [{ time: '08:00' }], '2026-11-06': [{ time: '17:00' }],
+  } };
+  assert.equal(usualTime(row), '08:00');
+  assert.equal(usualTime({ cells: {} }), null);
+});
