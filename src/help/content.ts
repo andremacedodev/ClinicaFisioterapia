@@ -466,7 +466,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     title: "Como lançar aulas que ficaram faltando no sistema?",
     summary: "Use a grade de Lançar aulas, igual à planilha, para marcar presenças e faltas de uma vez.",
     audience: "admin",
-    keywords: ["lançar aulas", "aula faltando", "planilha", "grade", "presença", "falta", "não salva", "lançamento"],
+    keywords: ["lançar aulas", "aula faltando", "planilha", "grade", "presença", "falta", "reposição", "ausência justificada", "não salva", "lançamento"],
     steps: [
       { text: "No menu, clique em **Financeiro** e depois na aba **Lançar aulas**." },
       { text: "Escolha a **Fisioterapeuta** e o **Mês**. Aparece a grade com os pacientes nas linhas e os dias nas colunas, como na planilha." },
@@ -474,8 +474,8 @@ export const HELP_ARTICLES: HelpArticle[] = [
         text: "As aulas em **amarelo** já passaram e ainda estão como agendadas: falta lançar a presença ou a falta.",
       },
       {
-        text: "Clique na célula do dia: um clique marca **P** (presença), dois cliques **F** (falta), três cliques volta como estava. Em um dia sem aula, o sistema cria a aula ao salvar.",
-        tip: "Dias futuros, reposições, ausências justificadas e dias com duas aulas são ajustados pela **Agenda**.",
+        text: "Clique na célula do dia e escolha **Presença**, **Falta**, **Reposição** ou **Ausência justificada**. Em um dia sem aula, o sistema cria a aula ao salvar.",
+        tip: "A ausência justificada segue o limite do pacote: passando do limite, vira falta (o sistema avisa). Dias futuros e dias com duas aulas são ajustados pela **Agenda**.",
       },
       { text: "Clique em **Revisar e salvar**, confira o horário das aulas novas e clique em **Salvar**." },
       {

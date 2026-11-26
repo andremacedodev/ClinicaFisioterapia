@@ -47,8 +47,10 @@ export declare function buildLaunchGrid(options: {
   professionalId: string;
 }): { days: string[]; rows: LaunchRow[]; totals: LaunchTotals };
 
+export type EditableMark = "A" | "P" | "F" | "R" | "J";
+
 export type EditableCell =
-  | { editable: true; baseMark: "A" | "P" | "F" | null; appointmentId?: string }
+  | { editable: true; baseMark: EditableMark | null; appointmentId?: string }
   | { editable: false; reason: string };
 
 export declare function editableCell(
@@ -57,9 +59,6 @@ export declare function editableCell(
   today: string,
 ): EditableCell;
 
-export declare function nextCellMark(
-  baseMark: "A" | "P" | "F" | null,
-  shownMark: "A" | "P" | "F" | null,
-): "A" | "P" | "F" | null;
+export declare const CHOOSABLE_MARKS: Array<"P" | "F" | "R" | "J">;
 
 export declare function usualTime(row: LaunchRow | undefined): string | null;

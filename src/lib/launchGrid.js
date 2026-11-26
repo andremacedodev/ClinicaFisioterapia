@@ -133,7 +133,8 @@ export function buildLaunchGrid({ appointments, patients, month, professionalId 
 
 /**
  * Se a célula pode ser editada pela grade e qual é a marca de partida.
- * Só dias até hoje; célula vazia, ou com UMA aula agendada/presença/falta.
+ * Só dias até hoje; célula vazia, ou com UMA aula agendada, presença,
+ * falta, reposição ou ausência justificada.
  */
 export function editableCell(items, day, today) {
   if (day > today) return { editable: false, reason: "Dia futuro: lance pela Agenda." };
@@ -143,28 +144,14 @@ export function editableCell(items, day, today) {
     return { editable: false, reason: "Mais de uma aula neste dia: ajuste pela Agenda." };
   }
   const [item] = list;
-  if (["A", "P", "F"].includes(item.mark)) {
+  if (["A", "P", "F", "R", "J"].includes(item.mark)) {
     return { editable: true, baseMark: item.mark, appointmentId: item.id };
   }
-  return {
-    editable: false,
-    reason: `${item.mark === "R" ? "Reposição" : item.mark === "J" ? "Ausência justificada" : "Este status"}: ajuste pela Agenda.`,
-  };
+  return { editable: false, reason: "Status diferente: ajuste pela Agenda." };
 }
 
-const CYCLES = {
-  none: [null, "P", "F"],
-  A: ["A", "P", "F"],
-  P: ["P", "F"],
-  F: ["F", "P"],
-};
-
-/** Próxima marca ao clicar, a partir da marca original e da mostrada agora. */
-export function nextCellMark(baseMark, shownMark) {
-  const cycle = CYCLES[baseMark ?? "none"];
-  const index = cycle.indexOf(shownMark ?? null);
-  return cycle[(index + 1) % cycle.length];
-}
+/** Marcas que a pessoa pode escolher no menu da célula. */
+export const CHOOSABLE_MARKS = ["P", "F", "R", "J"];
 
 /** Horário mais frequente das aulas do paciente (para a aula nova). */
 export function usualTime(row) {
