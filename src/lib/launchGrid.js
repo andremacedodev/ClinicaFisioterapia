@@ -1,0 +1,125 @@
+// Grade de lançamento de aulas (Financeiro → Lançar aulas).
+// Mesma regra da planilha de comissão (src/lib/commission.js →
+// buildCommissionDetailReport): a aula conta para quem está na agenda, o dia
+// é o dia local da aula, e aulas pagas = presenças + reposições + faltas.
+// Arquivo .js para os testes em node (scripts/launch-grid.test.mjs).
+
+/** Marca de cada status na grade. null = não aparece (cancelada). */
+export function markOf(status) {
+  switch (status) {
+    case "presenca_registrada":
+      return "P";
+    case "reposicao":
+      return "R";
+    case "falta":
+      return "F";
+    case "ausencia_justificada":
+      return "J";
+    case "agendada":
+    case "confirmada":
+    case "scheduled":
+    case "confirmed":
+      return "A";
+    case "cancelada":
+    case "cancelled":
+      return null;
+    default:
+      return "?";
+  }
+}
+
+/** Marcas que entram na planilha de comissão (aulas pagas). */
+export const PAID_MARKS = ["P", "R", "F"];
+
+function pad(value) {
+  return String(value).padStart(2, "0");
+}
+
+/** Dia local (AAAA-MM-DD) de um horário, igual à planilha. */
+export function localDay(isoDateTime) {
+  const date = new Date(isoDateTime);
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** Hora local HH:MM. */
+export function localTime(isoDateTime) {
+  const date = new Date(isoDateTime);
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/** Todos os dias do mês "AAAA-MM". */
+export function monthDays(month) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const last = new Date(year, monthNumber, 0).getDate();
+  return Array.from({ length: last }, (_, index) => `${year}-${pad(monthNumber)}-${pad(index + 1)}`);
+}
+
+function emptyTotals() {
+  return { presences: 0, makeups: 0, absences: 0, paid: 0, pending: 0, excused: 0 };
+}
+
+function addToTotals(totals, mark) {
+  if (mark === "P") totals.presences += 1;
+  if (mark === "R") totals.makeups += 1;
+  if (mark === "F") totals.absences += 1;
+  if (mark === "A") totals.pending += 1;
+  if (mark === "J") totals.excused += 1;
+  if (PAID_MARKS.includes(mark)) totals.paid += 1;
+}
+
+/**
+ * Monta a grade de UMA fisioterapeuta num mês.
+ *
+ * @param appointments aulas do período (id, patient_id, professional_id,
+ *   start_time, status, patients { full_name })
+ * @param patients pacientes que devem aparecer mesmo sem aula (os ativos
+ *   dela): { id, full_name }
+ * @returns { days, rows: [{ patientId, name, cells: { [dia]: [{ id, mark,
+ *   status, time }] }, totals }], totals }
+ */
+export function buildLaunchGrid({ appointments, patients, month, professionalId }) {
+  const days = monthDays(month);
+  const daySet = new Set(days);
+  const rows = new Map();
+
+  const rowFor = (patientId, name) => {
+    if (!rows.has(patientId)) {
+      rows.set(patientId, { patientId, name, cells: {}, totals: emptyTotals() });
+    }
+    return rows.get(patientId);
+  };
+
+  (patients ?? []).forEach((patient) => rowFor(patient.id, patient.full_name));
+
+  (appointments ?? [])
+    .filter((appointment) => appointment.professional_id === professionalId)
+    .forEach((appointment) => {
+      const mark = markOf(appointment.status);
+      if (!mark) return;
+      const day = localDay(appointment.start_time);
+      if (!daySet.has(day)) return;
+      const patientId = appointment.patient_id ?? "sem-paciente";
+      const row = rowFor(patientId, appointment.patients?.full_name ?? "Paciente não informado");
+      const cell = row.cells[day] ?? [];
+      cell.push({
+        id: appointment.id,
+        mark,
+        status: appointment.status,
+        time: localTime(appointment.start_time),
+        startTime: appointment.start_time,
+      });
+      cell.sort((a, b) => a.startTime.localeCompare(b.startTime));
+      row.cells[day] = cell;
+      addToTotals(row.totals, mark);
+    });
+
+  const sortedRows = [...rows.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  const totals = emptyTotals();
+  sortedRows.forEach((row) => {
+    Object.keys(totals).forEach((key) => {
+      totals[key] += row.totals[key];
+    });
+  });
+
+  return { days, rows: sortedRows, totals };
+}
