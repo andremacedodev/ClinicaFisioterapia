@@ -458,7 +458,32 @@ export const HELP_ARTICLES: HelpArticle[] = [
       },
       { text: "Para conferir aula por aula, clique em **Exportar EXCEL**." },
     ],
-    related: ["alterar-comissao", "minha-producao"],
+    related: ["lancar-aulas-grade", "alterar-comissao", "minha-producao"],
+  },
+  {
+    id: "lancar-aulas-grade",
+    category: "comissoes",
+    title: "Como lançar aulas que ficaram faltando no sistema?",
+    summary: "Use a grade de Lançar aulas, igual à planilha, para marcar presenças e faltas de uma vez.",
+    audience: "admin",
+    keywords: ["lançar aulas", "aula faltando", "planilha", "grade", "presença", "falta", "não salva", "lançamento"],
+    steps: [
+      { text: "No menu, clique em **Financeiro** e depois na aba **Lançar aulas**." },
+      { text: "Escolha a **Fisioterapeuta** e o **Mês**. Aparece a grade com os pacientes nas linhas e os dias nas colunas, como na planilha." },
+      {
+        text: "As aulas em **amarelo** já passaram e ainda estão como agendadas: falta lançar a presença ou a falta.",
+      },
+      {
+        text: "Clique na célula do dia: um clique marca **P** (presença), dois cliques **F** (falta), três cliques volta como estava. Em um dia sem aula, o sistema cria a aula ao salvar.",
+        tip: "Dias futuros, reposições, ausências justificadas e dias com duas aulas são ajustados pela **Agenda**.",
+      },
+      { text: "Clique em **Revisar e salvar**, confira o horário das aulas novas e clique em **Salvar**." },
+      {
+        text: "Pronto: as aulas entram na Agenda, no pacote e na comissão. A planilha exportada depois já vem com elas.",
+        tip: "Alterar o arquivo Excel não muda o sistema: o que é digitado no arquivo fica só no arquivo.",
+      },
+    ],
+    related: ["pagar-comissao"],
   },
   {
     id: "alterar-comissao",
