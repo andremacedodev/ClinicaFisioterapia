@@ -17,10 +17,10 @@ import {
 } from "../../lib/professionals";
 import {
   currentCommissionRule,
-  formatCommission,
   suggestedCommission,
   type CommissionRule,
 } from "../../lib/commissionRules";
+import { ClassValuesSection } from "./ClassValuesSection";
 
 const TIPOS_SESSAO: TipoSessao[] = [
   "RPG",
@@ -108,14 +108,14 @@ function roundCurrency(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
-// Comissão sugerida pela regra da fisioterapeuta que recebe a comissão
-// (a responsável pelo paciente) na data da aula. O valor sugerido fica
-// gravado na aula ao salvar.
+// Comissão sugerida pela regra da fisioterapeuta que DÁ a aula (a da agenda),
+// na data da aula. O valor fica gravado na aula ao salvar.
 function commissionProfessionalId(
   form: Pick<NovoAgendamentoForm, "fisioterapeutaId">,
-  patient: Paciente | undefined,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _patient?: Paciente | undefined,
 ): string | null {
-  return patient?.responsavelId || form.fisioterapeutaId || null;
+  return form.fisioterapeutaId || null;
 }
 
 function commissionDate(form: Pick<NovoAgendamentoForm, "data" | "horaInicio">): Date {
@@ -214,9 +214,6 @@ export const NovoAgendamentoModal: React.FC<Props> = ({
     (professional) => professional.id === form.fisioterapeutaId,
   );
   const isCommissionedPhysio = selectedProfessional?.role === "physio";
-  const commissionReceiver = fisioterapeutas.find(
-    (professional) => professional.id === commissionProfessionalId(form, selectedPatient),
-  );
   const tipoOptions = selectedPatient?.pacoteAtivo
     ? ["Pilates"]
     : (selectedPatient?.procedimentos ?? [])
@@ -585,58 +582,14 @@ export const NovoAgendamentoModal: React.FC<Props> = ({
               </div>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Valor bruto da aula</label>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                className="form-input"
-                value={form.valorAula ?? ""}
-                onChange={(e) =>
-                  campo(
-                    "valorAula",
-                    e.target.value ? Number(e.target.value) : undefined,
-                  )
-                }
-              />
-            </div>
-
-            {isCommissionedPhysio && (
-              <div className="form-group">
-                <label className="form-label">Valor a receber pela fisioterapeuta</label>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  className="form-input"
-                  value={form.valorComissao ?? ""}
-                  onChange={(e) =>
-                    campo(
-                      "valorComissao",
-                      e.target.value
-                        ? roundCurrency(Number(e.target.value))
-                        : undefined,
-                    )
-                  }
-                />
-                <span className="form-help">
-                  Comissão desta aula específica. Sugestão pela regra
-                  {commissionReceiver ? ` de ${commissionReceiver.nome}` : ""}:{" "}
-                  {formatCommission(
-                    currentCommissionRule(
-                      commissionRules,
-                      commissionProfessionalId(form, selectedPatient),
-                      commissionDate(form),
-                    ),
-                  )}
-                  {commissionReceiver && commissionReceiver.id !== form.fisioterapeutaId
-                    ? " (a comissão vai para a fisioterapeuta responsável pelo paciente)"
-                    : ""}
-                  .
-                </span>
-              </div>
-            )}
+            <ClassValuesSection
+              form={form}
+              patient={selectedPatient}
+              professional={selectedProfessional}
+              isCommissioned={isCommissionedPhysio}
+              commissionRules={commissionRules}
+              onChange={(changes) => setForm((current) => ({ ...current, ...changes }))}
+            />
 
             {/* Observações */}
             <div className="form-group">
