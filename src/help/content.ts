@@ -469,7 +469,10 @@ export const HELP_ARTICLES: HelpArticle[] = [
     keywords: ["lançar aulas", "aula faltando", "planilha", "grade", "presença", "falta", "reposição", "ausência justificada", "não salva", "lançamento"],
     steps: [
       { text: "No menu, clique em **Financeiro** e depois na aba **Lançar aulas**." },
-      { text: "Escolha a **Fisioterapeuta** e o **Mês**. Aparece a grade com os pacientes nas linhas e os dias nas colunas, como na planilha." },
+      {
+        text: "Escolha a **Fisioterapeuta** e o **Mês**. Aparece a grade com os pacientes nas linhas e os dias nas colunas, como na planilha.",
+        tip: "A dona da clínica também aparece na lista, para lançar as aulas dela. As aulas da administradora não geram comissão.",
+      },
       {
         text: "As aulas em **amarelo** já passaram e ainda estão como agendadas: falta lançar a presença ou a falta.",
       },
