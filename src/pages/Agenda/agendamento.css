@@ -1209,3 +1209,143 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Valores desta aula (valor bruto, comissão em % ou R$, resumo) ───────────── */
+.class-values {
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  padding: 0.9rem 1rem 1rem;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  min-width: 0;
+}
+
+.class-values-title {
+  padding: 0 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--gray-800);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.class-values-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.money-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.money-field .form-input {
+  width: 100%;
+  padding-left: 2.6rem;
+  font-variant-numeric: tabular-nums;
+}
+.money-field .money-affix {
+  position: absolute;
+  left: 0.9rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--gray-600);
+  pointer-events: none;
+}
+.money-field.suffix .form-input {
+  padding-left: 0.9rem;
+  padding-right: 2.4rem;
+}
+.money-field.suffix .money-affix {
+  left: auto;
+  right: 0.9rem;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1.5px solid var(--gray-200);
+  border-radius: 999px;
+  padding: 2px;
+  background: var(--gray-50);
+}
+.segmented button {
+  min-width: 44px;
+  min-height: 32px;
+  padding: 0 0.8rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--gray-600);
+  cursor: pointer;
+}
+.segmented button.active {
+  background: #fff;
+  color: var(--teal-700);
+  box-shadow: var(--shadow-sm);
+}
+
+.link-button {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--teal-700);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.class-values-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  background: var(--teal-50);
+  border: 1px solid var(--teal-100);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 0.9rem;
+  color: var(--teal-900);
+}
+.class-values-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.class-values-summary strong {
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+.class-values-summary .summary-label,
+.class-values-summary .summary-detail {
+  font-size: 0.75rem;
+}
+.class-values-summary .summary-label {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.class-values-summary.warning {
+  background: var(--amber-50);
+  border-color: var(--amber-500);
+  color: var(--amber-600);
+}
+.class-values-summary .summary-warning {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.form-help {
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--gray-600);
+}
