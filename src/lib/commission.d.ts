@@ -56,16 +56,13 @@ export declare function commissionFromRule(
 ): number;
 
 export type ResponsibleProfessionalSource = {
-  commission_professional_id?: string | null;
-  commission_professional?: { id?: string | null; full_name?: string | null } | null;
   patients?: { profiles?: { id?: string | null; full_name?: string | null } | null } | null;
   profiles?: { id?: string | null; full_name?: string | null } | null;
 };
 
 /**
- * Quem recebe a comissão da aula: a profissional gravada na aula (quando a
- * responsável do paciente mudou depois); senão a responsável atual do
- * paciente; senão quem deu a aula.
+ * Quem recebe a comissão da aula: a fisioterapeuta da agenda (quem deu a
+ * aula). Sem profissional na aula, a responsável do paciente.
  */
 export declare function getAppointmentResponsibleProfessional(
   appointment: ResponsibleProfessionalSource,

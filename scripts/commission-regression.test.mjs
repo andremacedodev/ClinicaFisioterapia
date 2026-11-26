@@ -184,42 +184,44 @@ test('two changes at the same moment: the latest created wins', () => {
   assert.equal(report[0].professionalShare, 45);
 });
 
-// Troca de fisioterapeuta responsável: aulas já dadas ficam com quem era a
-// responsável na data (commission_professional_id gravado pelo banco); as
-// seguintes vão para a responsável atual do paciente.
-test('after a transfer, past classes keep the previous responsible and new ones go to the new one', () => {
+// A comissão vai para a fisioterapeuta da agenda (quem deu a aula), não para
+// a responsável do paciente. A mesma paciente aparece na planilha de cada uma.
+test('commission goes to the professional who gave the class, even if the patient belongs to another', () => {
   const rules = [
-    { professional_id: 'antiga', commission_type: 'percent', commission_value: 40, valid_from: '1900-01-01T00:00:00Z' },
-    { professional_id: 'nova', commission_type: 'fixed', commission_value: 30, valid_from: '1900-01-01T00:00:00Z' },
+    { professional_id: 'ana', commission_type: 'percent', commission_value: 40, valid_from: '1900-01-01T00:00:00Z' },
+    { professional_id: 'bia', commission_type: 'fixed', commission_value: 30, valid_from: '1900-01-01T00:00:00Z' },
   ];
-  const patient = { full_name: 'Paciente', status: 'ativo', profiles: { id: 'nova', full_name: 'Nova' } };
-  const before = {
-    ...makeAppointment('1', '2026-11-20T12:00:00Z'),
-    patients: patient,
-    commission_professional_id: 'antiga',
-    commission_professional: { id: 'antiga', full_name: 'Antiga' },
-  };
-  const after = { ...makeAppointment('2', '2026-11-27T12:00:00Z'), patients: patient };
+  const patient = { full_name: 'Paciente', status: 'ativo', profiles: { id: 'bia', full_name: 'Bia' } };
+  const withAna = { ...makeAppointment('1', '2026-11-05T12:00:00Z'), patients: patient, profiles: { id: 'ana', full_name: 'Ana' } };
+  const withAna2 = { ...makeAppointment('2', '2026-11-12T12:00:00Z'), patients: patient, profiles: { id: 'ana', full_name: 'Ana' } };
+  const withBia = { ...makeAppointment('3', '2026-11-19T12:00:00Z'), patients: patient, profiles: { id: 'bia', full_name: 'Bia' } };
 
-  const report = buildCommissionReport([before, after], null, undefined, undefined, rules);
+  const report = buildCommissionReport([withAna, withAna2, withBia], null, undefined, undefined, rules);
   const byId = Object.fromEntries(report.map((item) => [item.professionalId, item]));
+  assert.equal(byId.ana.heldClasses, 2);
+  assert.equal(byId.ana.professionalShare, 80); // 40% de 100, duas aulas
+  assert.equal(byId.bia.heldClasses, 1);
+  assert.equal(byId.bia.professionalShare, 30); // fixo da Bia
 
-  assert.equal(byId.antiga.professionalName, 'Antiga');
-  assert.equal(byId.antiga.heldClasses, 1);
-  assert.equal(byId.antiga.professionalShare, 40); // 40% de 100, regra da antiga
-  assert.equal(byId.nova.heldClasses, 1);
-  assert.equal(byId.nova.professionalShare, 30); // valor fixo da nova
-
-  const detail = buildCommissionDetailReport([before, after], null, '2026-11-01', '2026-11-30', rules);
-  assert.deepEqual(detail.map((row) => row.professionalId).sort(), ['antiga', 'nova']);
+  const detail = buildCommissionDetailReport([withAna, withAna2, withBia], null, '2026-11-01', '2026-11-30', rules);
+  const rows = detail.map((row) => `${row.professionalId}:${row.patientId}:${row.paidClasses}`).sort();
+  assert.deepEqual(rows, ['ana:p1:2', 'bia:p1:1']);
 });
 
-test('without the recorded field the commission follows the current responsible (old behaviour)', () => {
+test('classes of the clinic owner do not generate commission', () => {
   const appointment = {
-    ...makeAppointment('1', '2026-11-20T12:00:00Z'),
-    patients: { full_name: 'Paciente', status: 'ativo', profiles: { id: 'nova', full_name: 'Nova' } },
+    ...makeAppointment('1', '2026-11-05T12:00:00Z'),
+    patients: { full_name: 'Paciente', status: 'ativo', profiles: { id: 'bia', full_name: 'Bia' } },
+    profiles: { id: 'dona', full_name: 'Dona' },
   };
-  const report = buildCommissionReport([appointment], null);
-  assert.equal(report.length, 1);
-  assert.equal(report[0].professionalId, 'nova');
+  assert.equal(buildCommissionReport([appointment], 'dona').length, 0);
+});
+
+test('class without professional falls back to the patient responsible', () => {
+  const appointment = {
+    ...makeAppointment('1', '2026-11-05T12:00:00Z'),
+    patients: { full_name: 'Paciente', status: 'ativo', profiles: { id: 'bia', full_name: 'Bia' } },
+    profiles: null,
+  };
+  assert.equal(buildCommissionReport([appointment], null)[0].professionalId, 'bia');
 });
