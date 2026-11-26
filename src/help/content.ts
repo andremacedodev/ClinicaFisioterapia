@@ -252,6 +252,28 @@ export const HELP_ARTICLES: HelpArticle[] = [
       },
       { text: "Clique em **Salvar alterações**." },
     ],
+    related: ["trocar-fisioterapeuta-paciente"],
+  },
+  {
+    id: "trocar-fisioterapeuta-paciente",
+    category: "pacientes",
+    title: "Como passar um paciente para outra fisioterapeuta?",
+    summary: "Troque a fisioterapeuta responsável. As aulas futuras vão para a nova; o que já aconteceu fica com a anterior.",
+    audience: "admin",
+    keywords: ["trocar fisioterapeuta", "mudar responsável", "transferir paciente", "passar paciente", "outra fisioterapeuta", "fisioterapeuta responsável"],
+    steps: [
+      { text: "No menu, clique em **Pacientes** e encontre o paciente." },
+      { text: "No cartão do paciente, clique em **Editar paciente**." },
+      {
+        text: "Em **Fisioterapeuta responsável**, escolha a nova fisioterapeuta. Aparece um aviso dizendo quantas aulas agendadas vão passar para ela.",
+        tip: "Só mudam as aulas deste paciente que estavam com a fisioterapeuta anterior, do momento da troca em diante. Aulas que já aconteceram continuam com a anterior no histórico e na comissão, porque a comissão é de quem deu a aula.",
+      },
+      { text: "Clique em **Salvar alterações**." },
+      {
+        text: "Para trocar só uma aula, sem mudar a responsável, abra a aula na **Agenda** e clique no lápis.",
+      },
+    ],
+    related: ["inativar-fisioterapeuta", "editar-pausar-paciente"],
   },
 
   // ── Agenda ──────────────────────────────────────────────────────────────────
@@ -603,6 +625,14 @@ export const HELP_FAQS: HelpFaq[] = [
     keywords: ["comissão", "porcentagem", "valor fixo", "alterar"],
   },
   {
+    id: "comissao-de-quem-deu-a-aula",
+    question: "De quem é a comissão de uma aula?",
+    answer:
+      "De quem está na agenda daquela aula, ou seja, quem deu a aula. Se uma paciente teve aulas com duas fisioterapeutas no mês, ela aparece na planilha de cada uma, com as aulas que teve com cada uma. Trocar a fisioterapeuta responsável do paciente não muda as aulas que já aconteceram.",
+    audience: "admin",
+    keywords: ["comissão", "quem recebe", "duas fisioterapeutas", "trocou de fisioterapeuta", "planilha"],
+  },
+  {
     id: "falta-justificada-diferenca",
     question: "Qual a diferença entre falta e ausência justificada?",
     answer:
@@ -691,7 +721,7 @@ const HELP_CONTEXT_RULES: { pattern: RegExp; context: HelpContext }[] = [
     pattern: /^\/pacientes/,
     context: {
       title: "Pacientes",
-      articleIds: ["cadastrar-paciente-com-pacote", "renovar-pacote", "editar-pausar-paciente", "escrever-evolucao"],
+      articleIds: ["cadastrar-paciente-com-pacote", "renovar-pacote", "editar-pausar-paciente", "trocar-fisioterapeuta-paciente"],
     },
   },
   {

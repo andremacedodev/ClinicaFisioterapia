@@ -1660,9 +1660,8 @@ export async function atualizarPaciente(
       quick_note: emptyToNull(form.quick_note),
       address,
       status: form.status,
-      responsible_professional_id: emptyToNull(
-        form.responsible_professional_id,
-      ),
+      // A fisioterapeuta responsável é trocada só por
+      // trocarFisioterapeutaResponsavel, que também move as aulas futuras.
     })
     .eq("id", patientId)
     .select(
@@ -1677,6 +1676,65 @@ export async function atualizarPaciente(
   // Cadastro do paciente não altera pacote, financeiro nem agendamentos.
   // Novas sessões devem ser criadas exclusivamente no fluxo de renovação.
   return data as Patient;
+}
+
+function formatTransferError(action: string, error: SupabaseErrorLike): Error {
+  // Função ainda não criada no banco (migration não rodada).
+  if (error.code === "PGRST202" || /transfer_patient_responsible|patient_transfer_summary/.test(error.message ?? "")) {
+    return new Error(
+      `${action}: a função do banco não existe. Rode a migration 20261126100000_transfer_patient_responsible.sql no Supabase.`,
+    );
+  }
+  return new Error(`${action}: ${error.message}`);
+}
+
+export type ResumoTrocaResponsavel = {
+  current_professional_id: string | null;
+  future_appointments: number;
+  active_packages: number;
+};
+
+/** O que muda se a fisioterapeuta responsável deste paciente for trocada agora. */
+export async function resumoTrocaResponsavel(
+  patientId: string,
+): Promise<ResumoTrocaResponsavel> {
+  const { data, error } = await supabase.rpc("patient_transfer_summary", {
+    p_patient_id: patientId,
+  });
+  if (error) {
+    throw formatTransferError("Erro ao calcular a troca de fisioterapeuta", error);
+  }
+  const row = (Array.isArray(data) ? data[0] : data) as ResumoTrocaResponsavel | undefined;
+  return {
+    current_professional_id: row?.current_professional_id ?? null,
+    future_appointments: row?.future_appointments ?? 0,
+    active_packages: row?.active_packages ?? 0,
+  };
+}
+
+/**
+ * Troca a fisioterapeuta responsável. As aulas deste paciente com a anterior,
+ * do momento da troca em diante, e os pacotes ativos dela passam para a nova.
+ * Aulas que já aconteceram não mudam (histórico e comissão de quem deu a aula).
+ */
+export async function trocarFisioterapeutaResponsavel(
+  patientId: string,
+  newProfessionalId: string,
+): Promise<{ moved_appointments: number; moved_packages: number }> {
+  const { data, error } = await supabase.rpc("transfer_patient_responsible", {
+    p_patient_id: patientId,
+    p_new_professional_id: newProfessionalId,
+  });
+  if (error) {
+    throw formatTransferError("Erro ao trocar a fisioterapeuta responsável", error);
+  }
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | { moved_appointments: number; moved_packages: number }
+    | undefined;
+  return {
+    moved_appointments: row?.moved_appointments ?? 0,
+    moved_packages: row?.moved_packages ?? 0,
+  };
 }
 
 // Mantido para compatibilidade com rotinas internas legadas; não é usado pela edição cadastral.
