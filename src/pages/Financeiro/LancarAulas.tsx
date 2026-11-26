@@ -172,7 +172,8 @@ export const FinancialLaunchClasses = () => {
         .from("profiles")
         .select("id, full_name, role, active")
         .eq("clinic_id", clinicId)
-        .eq("role", "physio")
+        // A dona (administradora) também dá aulas: entra na lista, sem comissão.
+        .in("role", ["physio", "admin"])
         .order("full_name");
       if (cancelled) return;
       if (loadError) {
@@ -424,6 +425,8 @@ export const FinancialLaunchClasses = () => {
               time: times[change.key] || "08:00",
               mark: change.mark,
               orderInPatient: order,
+              // Igual à Agenda: só fisioterapeuta recebe comissão por aula.
+              commissioned: selected?.role === "physio",
             },
             rules,
           );
@@ -485,6 +488,7 @@ export const FinancialLaunchClasses = () => {
                 {professionals.map((professional) => (
                   <option key={professional.id} value={professional.id}>
                     {withInactiveLabel(professional.full_name, professional)}
+                    {professional.role === "admin" ? " (administradora, sem comissão)" : ""}
                   </option>
                 ))}
               </select>
@@ -901,7 +905,9 @@ export const FinancialLaunchClasses = () => {
                     Criar {creates.length} {creates.length === 1 ? "aula" : "aulas"}
                   </h3>
                   <p className="mb-2 text-xs text-slate-500">
-                    Com o valor do pacote (ou do procedimento) e a comissão pela regra de {selected?.full_name?.split(" ")[0]}. Confira o horário.
+                    {selected?.role === "physio"
+                      ? `Com o valor do pacote (ou do procedimento) e a comissão pela regra de ${selected.full_name.split(" ")[0]}. Confira o horário.`
+                      : "Com o valor do pacote (ou do procedimento), sem comissão (administradora). Confira o horário."}
                   </p>
                   <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
                     {creates.map((change) => {

@@ -42,6 +42,8 @@ export type LaunchCreate = {
   mark: "P" | "F" | "R" | "J";
   /** Posição desta aula entre as novas do mesmo paciente (0, 1, 2…), em ordem de data. */
   orderInPatient: number;
+  /** Fisioterapeuta comissionada? A administradora (dona) não recebe comissão. */
+  commissioned?: boolean;
 };
 
 /** Próximo número de aula do pacote, contando as novas que vêm antes. */
@@ -69,13 +71,14 @@ export function buildLaunchForm(
   rules: CommissionRule[],
 ): NovoAgendamentoForm {
   const { patient, patientId, professionalId, day, time, mark, orderInPatient } = create;
+  const commissioned = create.commissioned ?? true;
   const pacote = patient?.pacoteAtivo;
   const procedure = patient?.procedimentos?.[0];
   const classValue = pacote ? pacote.valorAula : Number(procedure?.agreed_value) || 0;
   const when = new Date(`${day}T${time}:00`);
   const rule = currentCommissionRule(rules, professionalId, when);
   const commission =
-    rule?.commission_type === "fixed" || classValue
+    commissioned && (rule?.commission_type === "fixed" || classValue)
       ? round2(suggestedCommission(rules, professionalId, classValue, when))
       : 0;
   const sessionNumber = sessionNumberFor(patient, orderInPatient);
