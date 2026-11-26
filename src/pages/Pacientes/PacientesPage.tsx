@@ -25,6 +25,7 @@ import { getFisioterapeutas } from "../Agenda/Agendamentoservice";
 import { Fisioterapeuta } from "../Agenda/types";
 import {
   atualizarPaciente,
+  trocarFisioterapeutaResponsavel,
   atualizarObservacaoPaciente,
   criarPaciente,
   encerrarPaciente,
@@ -360,19 +361,40 @@ export const PacientesPage = () => {
             .sort((a, b) => a.full_name.localeCompare(b.full_name)),
         );
       } else if (editingPatient) {
-        const patient = await atualizarPaciente(editingPatient.id, form);
-        setPatients((current) =>
-          (current.some((item) => item.id === patient.id)
-            ? current.map((item) =>
-                item.id === patient.id
-                  ? { ...patient, lesson_packages: item.lesson_packages }
-                  : item,
-              )
-            : [...current, patient]
-          )
-            .filter(matchesProfessionalFilter)
-            .sort((a, b) => a.full_name.localeCompare(b.full_name)),
-        );
+        const savedPatient = await atualizarPaciente(editingPatient.id, form);
+        const replaceInList = (patient: Patient) =>
+          setPatients((current) =>
+            (current.some((item) => item.id === patient.id)
+              ? current.map((item) =>
+                  item.id === patient.id
+                    ? { ...patient, lesson_packages: item.lesson_packages }
+                    : item,
+                )
+              : [...current, patient]
+            )
+              .filter(matchesProfessionalFilter)
+              .sort((a, b) => a.full_name.localeCompare(b.full_name)),
+          );
+
+        const newResponsibleId = form.responsible_professional_id.trim();
+        if (
+          newResponsibleId &&
+          newResponsibleId !== (editingPatient.responsible_professional_id ?? "")
+        ) {
+          try {
+            await trocarFisioterapeutaResponsavel(editingPatient.id, newResponsibleId);
+          } catch (transferError) {
+            replaceInList(savedPatient);
+            const reason =
+              transferError instanceof Error ? transferError.message : String(transferError);
+            throw new Error(
+              `Os dados do paciente foram salvos, mas a fisioterapeuta responsável NÃO foi trocada. ${reason}`,
+            );
+          }
+          replaceInList({ ...savedPatient, responsible_professional_id: newResponsibleId });
+        } else {
+          replaceInList(savedPatient);
+        }
       } else {
         const patient = await criarPaciente(profile.clinic_id, form);
         setPatients((current) =>

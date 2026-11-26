@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
+  ArrowRightLeft,
   Calendar,
   Clock,
   ClipboardList,
@@ -31,6 +32,7 @@ import {
 import { Fisioterapeuta } from "../Agenda/types";
 import { professionalsForSelection, withInactiveLabel } from "../../lib/professionals";
 import { GENDER_OPTIONS, genderFormValue } from "../../lib/patientLabels";
+import { resumoTrocaResponsavel, type ResumoTrocaResponsavel } from "./PacientesService";
 
 interface NovoPacienteModalProps {
   isOpen: boolean;
@@ -541,6 +543,43 @@ export const NovoPacienteModal = ({
       lastFetchedCep.current = "";
     }
   }, [isOpen, mode, patient]);
+
+  // Edição: o que muda se a fisioterapeuta responsável for trocada.
+  const originalResponsibleId = isEditing ? patient?.responsible_professional_id ?? "" : "";
+  const [transferSummary, setTransferSummary] = useState<ResumoTrocaResponsavel | null>(null);
+  const [transferSummaryError, setTransferSummaryError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen || !isEditing || !patient?.id) return;
+    let cancelled = false;
+    setTransferSummary(null);
+    setTransferSummaryError(null);
+    resumoTrocaResponsavel(patient.id)
+      .then((summary) => {
+        if (!cancelled) setTransferSummary(summary);
+      })
+      .catch((summaryError: unknown) => {
+        if (!cancelled) {
+          setTransferSummaryError(
+            summaryError instanceof Error ? summaryError.message : String(summaryError),
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, isEditing, patient?.id]);
+
+  const responsibleChanged =
+    isEditing &&
+    Boolean(formData.responsible_professional_id) &&
+    formData.responsible_professional_id !== originalResponsibleId;
+  const professionalName = (id: string) =>
+    fisioterapeutas.find((professional) => professional.id === id)?.nome ?? "a fisioterapeuta anterior";
+  const previousResponsibleName = originalResponsibleId
+    ? professionalName(originalResponsibleId)
+    : "";
+  const newResponsibleName = professionalName(formData.responsible_professional_id);
 
   useEffect(() => {
     if (
@@ -1907,6 +1946,105 @@ export const NovoPacienteModal = ({
                       <strong className="text-slate-900 dark:text-white">
                         {currencyFormatter.format(proceduresTotal)}
                       </strong>
+                    </div>
+                  )}
+                </div>
+                )}
+
+                {isEditing && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">
+                    Fisioterapeuta responsável
+                  </h3>
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="patient-responsible"
+                      className="text-sm font-medium text-slate-700 dark:text-slate-300"
+                    >
+                      Fisioterapeuta responsável
+                    </label>
+                    <select
+                      id="patient-responsible"
+                      required
+                      disabled={loading}
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                      value={formData.responsible_professional_id}
+                      onChange={(event) =>
+                        updateField("responsible_professional_id", event.target.value)
+                      }
+                    >
+                      {!originalResponsibleId && <option value="">Selecione</option>}
+                      {professionalsForSelection(fisioterapeutas, originalResponsibleId).map(
+                        (professional) => (
+                          <option key={professional.id} value={professional.id}>
+                            {withInactiveLabel(professional.nome, professional)}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </div>
+
+                  {responsibleChanged && (
+                    <div
+                      role="status"
+                      className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-100"
+                    >
+                      <p className="flex items-center gap-2 font-semibold">
+                        <ArrowRightLeft size={16} aria-hidden="true" />
+                        {previousResponsibleName
+                          ? `Trocar de ${previousResponsibleName} para ${newResponsibleName}`
+                          : `Definir ${newResponsibleName} como responsável`}
+                      </p>
+                      <ul className="mt-2 list-disc space-y-1 pl-5">
+                        {previousResponsibleName && (
+                          <li>
+                            As aulas que já aconteceram continuam com{" "}
+                            <strong>{previousResponsibleName}</strong>: no histórico e na
+                            comissão dela, porque a comissão é de quem deu a aula.
+                          </li>
+                        )}
+                        {previousResponsibleName && (
+                          <li>
+                            {transferSummary ? (
+                              transferSummary.future_appointments > 0 ? (
+                                <>
+                                  <strong>
+                                    {transferSummary.future_appointments}{" "}
+                                    {transferSummary.future_appointments === 1
+                                      ? "aula agendada"
+                                      : "aulas agendadas"}
+                                  </strong>{" "}
+                                  com {previousResponsibleName}, do momento da troca em diante,{" "}
+                                  {transferSummary.future_appointments === 1 ? "passa" : "passam"} para{" "}
+                                  <strong>{newResponsibleName}</strong>.
+                                </>
+                              ) : (
+                                <>Não há aulas futuras com {previousResponsibleName} para transferir.</>
+                              )
+                            ) : transferSummaryError ? (
+                              <>As aulas futuras com {previousResponsibleName} passam para {newResponsibleName}.</>
+                            ) : (
+                              <>Calculando as aulas futuras…</>
+                            )}
+                          </li>
+                        )}
+                        {transferSummary && transferSummary.active_packages > 0 && (
+                          <li>
+                            O pacote ativo passa a ser de <strong>{newResponsibleName}</strong>.
+                          </li>
+                        )}
+                        <li>
+                          Aulas futuras marcadas com outra fisioterapeuta não mudam. Para trocar
+                          uma aula específica, use o lápis na Agenda.
+                        </li>
+                      </ul>
+                      {transferSummaryError && (
+                        <p className="mt-2 flex items-start gap-2 text-red-700 dark:text-red-300">
+                          <AlertCircle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+                          <span>{transferSummaryError}</span>
+                        </p>
+                      )}
+                      <p className="mt-2 text-xs">A troca é feita ao clicar em salvar.</p>
                     </div>
                   )}
                 </div>
