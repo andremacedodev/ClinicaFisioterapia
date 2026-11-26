@@ -12,6 +12,7 @@ import { clsx } from "clsx";
 import { Loader2 } from "lucide-react";
 import { FinancialCommissions } from "./Comissoes";
 import { FinancialExpenses } from "./Despesas";
+import { FinancialLaunchClasses } from "./LancarAulas";
 import { FinancialStatement } from "./Extrato";
 import { FinancialModals } from "./FinancialModals";
 import { FinancialToolbar } from "./FinancialToolbar";
@@ -24,6 +25,7 @@ const TABS = [
   { to: "/financeiro/recebimentos", label: "Recebimentos" },
   { to: "/financeiro/despesas", label: "Despesas" },
   { to: "/financeiro/comissoes", label: "Comissões" },
+  { to: "/financeiro/lancar-aulas", label: "Lançar aulas" },
   { to: "/financeiro/extrato", label: "Extrato" },
 ];
 
@@ -170,6 +172,14 @@ export const Financial = () => (
           element={
             <StaffOnly>
               <FinancialCommissions />
+            </StaffOnly>
+          }
+        />
+        <Route
+          path="lancar-aulas"
+          element={
+            <StaffOnly>
+              <FinancialLaunchClasses />
             </StaffOnly>
           }
         />
