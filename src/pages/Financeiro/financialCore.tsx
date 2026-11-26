@@ -69,9 +69,6 @@ export type CommissionAppointment = {
   status: string;
   class_price: number | string | null;
   commission_amount: number | string | null;
-  /** Quem recebe a comissão, gravado quando a responsável do paciente mudou. */
-  commission_professional_id?: string | null;
-  commission_professional?: { id: string; full_name: string } | null;
   patients: {
     full_name: string;
     status: string;
@@ -646,7 +643,7 @@ export function getPatientProfessionalName(
   return patient?.profiles?.full_name ?? "Sem fisioterapeuta";
 }
 
-/** Mesma regra do relatório (src/lib/commission.js). */
+/** Mesma regra do relatório (src/lib/commission.js): quem deu a aula. */
 export function getAppointmentResponsibleProfessional(
   appointment: CommissionAppointment,
 ): { id: string; full_name: string } {
@@ -787,18 +784,17 @@ export function useFinancialController() {
     const endExclusive = addDays(parseDateInput(endDate), 1);
     endExclusive.setHours(0, 0, 0, 0);
 
-    const buildAppointmentsQuery = (withCommissionProfessional: boolean) =>
-      supabase
-        .from("appointments")
-        .select(
-          `
+    const appointmentsQuery = supabase
+      .from("appointments")
+      .select(
+        `
           id,
           patient_id,
           package_id,
           start_time,
           status,
           class_price,
-          commission_amount,${withCommissionProfessional ? "\n          commission_professional_id," : ""}
+          commission_amount,
           patients (
             full_name,
             status,
@@ -811,23 +807,13 @@ export function useFinancialController() {
             procedure_amount,
             total_amount
           )
-          `,
-        )
-        .eq("clinic_id", profile.clinic_id)
-        .gte("start_time", start.toISOString())
-        .lt("start_time", endExclusive.toISOString());
+        `,
+      )
+      .eq("clinic_id", profile.clinic_id)
+      .gte("start_time", start.toISOString())
+      .lt("start_time", endExclusive.toISOString());
 
-    let appointmentsResult = await buildAppointmentsQuery(true);
-    // Banco ainda sem a migration 20261126000000: segue com a regra antiga.
-    if (
-      appointmentsResult.error &&
-      /commission_professional_id/.test(appointmentsResult.error.message ?? "")
-    ) {
-      console.warn(
-        "Coluna appointments.commission_professional_id não existe: rode a migration 20261126000000_commission_professional_snapshot.sql.",
-      );
-      appointmentsResult = await buildAppointmentsQuery(false);
-    }
+    const appointmentsResult = await appointmentsQuery;
 
     if (appointmentsResult.error) {
       setError(appointmentsResult.error.message);
@@ -836,36 +822,6 @@ export function useFinancialController() {
 
     const fetchedAppointments =
       (appointmentsResult.data ?? []) as unknown as CommissionAppointment[];
-
-    // Nome de quem recebe a comissão nas aulas em que isso ficou gravado.
-    const recordedProfessionalIds = [
-      ...new Set(
-        fetchedAppointments
-          .map((appointment) => appointment.commission_professional_id)
-          .filter((id): id is string => Boolean(id)),
-      ),
-    ];
-    if (recordedProfessionalIds.length > 0) {
-      const { data: recordedProfessionals, error: recordedError } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", recordedProfessionalIds);
-      if (recordedError) {
-        setError(
-          `Não foi possível carregar o nome das profissionais da comissão: ${recordedError.message}`,
-        );
-        return appointmentsResult;
-      }
-      const namesById = new Map(
-        (recordedProfessionals ?? []).map((item) => [item.id as string, item as { id: string; full_name: string }]),
-      );
-      fetchedAppointments.forEach((appointment) => {
-        if (appointment.commission_professional_id) {
-          appointment.commission_professional =
-            namesById.get(appointment.commission_professional_id) ?? null;
-        }
-      });
-    }
 
     const appointmentsToSet =
       profile.role === "physio"
