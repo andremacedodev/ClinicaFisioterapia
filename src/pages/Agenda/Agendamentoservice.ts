@@ -1,3 +1,4 @@
+import { buildAppointmentNotes, isSameInstant } from "../../lib/appointmentNotes";
 import { supabase } from "../../lib/supabase";
 import { isMissingActiveColumn } from "../../lib/professionals";
 import {
@@ -777,17 +778,18 @@ export async function atualizarAgendamento(
     .package_id;
   const newStart = toDateTime(normalizedForm.data, normalizedForm.horaInicio);
   const newEnd = toDateTime(normalizedForm.data, normalizedForm.horaFim);
-  const changedSchedule = oldStart !== newStart || oldEnd !== newEnd;
+  // Compara o instante: o banco devolve "+00:00" e aqui é ".000Z".
+  const changedSchedule =
+    !isSameInstant(oldStart, newStart) || !isSameInstant(oldEnd, newEnd);
   const remarcacaoNote = changedSchedule
     ? `Remarcação: de ${formatDateBr(toDate(oldStart))} ${toTime(oldStart)}-${toTime(oldEnd)} para ${formatDateBr(normalizedForm.data)} ${normalizedForm.horaInicio}-${normalizedForm.horaFim}.`
     : "";
-  const notes = [
-    normalizedForm.manualCorrection ? "[CORREÇÃO AVULSA]" : "",
-    normalizedForm.observacoes || oldNotes || "",
-    remarcacaoNote,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  // Fica só a remarcação mais recente; as anteriores não se acumulam.
+  const notes = buildAppointmentNotes({
+    notes: normalizedForm.observacoes || oldNotes || "",
+    manualCorrection: Boolean(normalizedForm.manualCorrection),
+    newReschedule: remarcacaoNote,
+  });
 
   const { data, error } = await supabase
     .from("appointments")
